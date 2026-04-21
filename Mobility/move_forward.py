@@ -28,8 +28,8 @@ class MoveForward(Node):
         self.declare_parameter('distance', 0.5)   # meters
         self.declare_parameter('speed', 0.1)      # m/s
 
-        self.target_distance = self.get_parameter('distance').value
-        self.speed = abs(self.get_parameter('speed').value)
+        self.target_distance = float(self.get_parameter('distance').value)
+        self.speed = absfloat((self.get_parameter('speed').value))
 
         # ROS interfaces
         self.cmd_pub = self.create_publisher(Twist, '/tb_{xx}/cmd_vel_unstamped', 10)
@@ -41,7 +41,7 @@ class MoveForward(Node):
         )
 
         # State variables
-        self.start_position = None
+        self.prev_position = None
         self.current_position = None
         self.distance_traveled = 0.0
         self.done_sent = False
@@ -55,17 +55,19 @@ class MoveForward(Node):
 
     def odom_callback(self, msg):
         x, y = get_position(msg)
+        self.current_position = (x,y)
 
-        if self.start_position is None:
-            self.start_position = (x, y)
+        if self.prev_position is None:
+            self.prev_position = (x, y)
             self.get_logger().info("Received first odometry reading.")
-
-        self.current_position = (x, y)
+            return
 
         # Compute Euclidean distance from start
         dx = x - self.start_position[0]
         dy = y - self.start_position[1]
-        self.distance_traveled = math.sqrt(dx**2 + dy**2)
+        step_distance = math.sqrt(dx**2 + dy**2)
+        self.distance_traveled += step_distance
+        self.prev_position = (x,y)
 
     def control_loop(self):
         if self.start_position is None or self.current_position is None:
@@ -75,20 +77,19 @@ class MoveForward(Node):
 
         if self.distance_traveled < self.target_distance:
             cmd.linear.x = self.speed
+            slef.cmd_pub.publish(cmd)
         else:
             cmd.linear.x = 0.0
             self.cmd_pub.publish(cmd)
 
             if not self.done_sent:
-                print("MOTION_DONE")  # <-- simple, script-friendly
+                print("MOTION_DONE") 
                 self.get_logger().info("Target distance reached. Stopping.")
                 self.done_sent = True
 
             rclpy.shutdown()
             return
         
-
-        self.cmd_pub.publish(cmd)
 
 
 def main(args=None):
