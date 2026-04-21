@@ -28,11 +28,12 @@ class MoveForward(Node):
         self.declare_parameter('distance', 0.5)   # meters
         self.declare_parameter('speed', 0.1)      # m/s
 
+        xx = self.get_parameter('xx').value
         self.target_distance = float(self.get_parameter('distance').value)
-        self.speed = absfloat((self.get_parameter('speed').value))
+        self.speed = abs(float(self.get_parameter('speed').value))
 
         # ROS interfaces
-        self.cmd_pub = self.create_publisher(Twist, '/tb_{xx}/cmd_vel_unstamped', 10)
+        self.cmd_pub = self.create_publisher(Twist, f'/tb_{xx}/cmd_vel_unstamped', 10)
         self.odom_sub = self.create_subscription(
             Odometry,
             '/tb_{xx}/odom',
@@ -41,6 +42,7 @@ class MoveForward(Node):
         )
 
         # State variables
+        self.start_position = None
         self.prev_position = None
         self.current_position = None
         self.distance_traveled = 0.0
@@ -48,7 +50,6 @@ class MoveForward(Node):
 
         # Timer loop (10 Hz)
         self.timer = self.create_timer(0.1, self.control_loop)
-
         self.get_logger().info(
             f"Moving forward {self.target_distance} m at {self.speed} m/s"
         )
@@ -58,6 +59,7 @@ class MoveForward(Node):
         self.current_position = (x,y)
 
         if self.prev_position is None:
+            self.start_position = (x, y)
             self.prev_position = (x, y)
             self.get_logger().info("Received first odometry reading.")
             return
