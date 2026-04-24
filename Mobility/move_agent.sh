@@ -17,11 +17,11 @@
 
 # ── Configuration ────────────────────────────────────────────────────────────
 REMOTE_USER="${REMOTE_USER:-ubuntu}"
-REMOTE_HOST="${REMOTE_HOST:-192.168.1.3}"
+REMOTE_HOST="${REMOTE_HOST:-192.168.185.3}"
 ROBOT_ID="${ROBOT_ID:-std}"                          # passed as -p xx:= to ROS nodes
-ROS_SETUP="${ROS_SETUP:-/opt/ros/humble/setup.bash}"
-WS_SETUP="${WS_SETUP:-~/ros2_ws/install/setup.bash}"
-PKG_NAME="${PKG_NAME:-your_package}"
+ROS_SETUP="${ROS_SETUP:-/opt/ros/jazzy/setup.bash}"
+WS_SETUP="${WS_SETUP:-~/tb4_motion_ws/install/setup.bash}"
+PKG_NAME="${PKG_NAME:-tb4_motion}"
 # ─────────────────────────────────────────────────────────────────────────────
 
 usage() {
