@@ -79,7 +79,7 @@ class MoveForward(Node):
 
         if self.distance_traveled < self.target_distance:
             cmd.linear.x = self.speed
-            slef.cmd_pub.publish(cmd)
+            self.cmd_pub.publish(cmd)
         else:
             cmd.linear.x = 0.0
             self.cmd_pub.publish(cmd)
