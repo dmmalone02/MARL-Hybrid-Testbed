@@ -1,5 +1,7 @@
 import os
 import time
+import subprocess
+
 import cv2
 import numpy as np
 
@@ -33,10 +35,13 @@ FRAME_HEIGHT = 480
 
 HEADINGS = ["front", "right", "back", "left"]
 
-# Number of frames to discard before saving, helps camera auto-exposure settle
-WARMUP_FRAMES = 12
+# Number of consecutive still frames required before saving
+STILL_NEEDED = 5
 
-# Small delay after user presses Enter before capture
+# Motion threshold: mean pixel difference below this = still
+MOTION_THRESH = 4.0
+
+# Small delay between frame reads
 CAPTURE_DELAY_SEC = 0.3
 
 # =========================================================
@@ -123,15 +128,20 @@ NUM_VIEWS = 4
 # =========================================================
 
 def is_still(prev, curr):
+    """Return True if the mean pixel difference is below MOTION_THRESH."""
     diff = cv2.absdiff(prev, curr)
     mean = np.mean(diff)
     return mean < MOTION_THRESH
 
+
 def call_move(cmd, a, b):
+    """Call the external move agent script."""
     subprocess.run(["bash", "./move_agent.sh", cmd, str(a), str(b)])
     time.sleep(2)  # allow stabilization
 
+
 def ensure_clean_dirs():
+    """Create output directories and remove stale files from previous runs."""
     os.makedirs(SCAN_DIR, exist_ok=True)
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
@@ -162,13 +172,11 @@ def make_empty_local_grid():
 
 def local_grid_to_matrix(final_grid):
     rows = []
-
     for row in [1, 0, -1]:
         vals = []
         for col in [-1, 0, 1]:
             vals.append(final_grid.get((col, row), "?"))
         rows.append(vals)
-
     return rows
 
 
@@ -180,15 +188,25 @@ def pretty_matrix(mat):
 # STEP 1: SCAN CAPTURE
 # =========================================================
 
+def capture_frame(cap):
+    """
+    Read one frame from the camera.
+    Returns (gray, frame) or (None, None) on failure.
+    """
+    ret, frame = cap.read()
+    if not ret or frame is None:
+        return None, None
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    return gray, frame
+
+
 def capture_scan_images():
     """
     Captures 4 still images with no camera preview.
-    Robot/Camera manually rotated between captures durint test.
-    Press Enter in the terminal for each heading.
+    Waits until STILL_NEEDED consecutive frames show no significant motion,
+    then saves the last frame for each heading.
+    Robot/camera is rotated between captures via call_move().
     """
-    STILL_NEEDED = 5
-    MOTION_THRESH = 4.0
-    
     cap = cv2.VideoCapture(CAMERA_INDEX)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
@@ -198,42 +216,37 @@ def capture_scan_images():
 
     try:
         for heading in HEADINGS:
-            # input(f"Point camera to {heading.upper()}, then press Enter to capture... ")
             print(f"\n--- Capturing {heading} ---")
             still_frames = 0
             prev_gray = None
-            
+            frame = None
+
             while still_frames < STILL_NEEDED:
-            gray, frame = capture_frame(cap)
-            if gray is None:
-                continue
+                gray, frame = capture_frame(cap)
+                if gray is None:
+                    continue
 
-            if prev_gray is not None:
-                if is_still(prev_gray, gray):
-                    still_frames += 1
-                else:
-                    still_frames = 0
+                if prev_gray is not None:
+                    if is_still(prev_gray, gray):
+                        still_frames += 1
+                    else:
+                        still_frames = 0
 
-            prev_gray = gray
+                prev_gray = gray
+                print(f"Still frames: {still_frames}/{STILL_NEEDED}", end="\r")
+                time.sleep(CAPTURE_DELAY_SEC)
 
-            print(f"Still frames: {still_frames}/{STILL_NEEDED}", end="\r")
-            time.sleep(CAPTURE_DELAY_SEC)
+            if frame is None:
+                raise RuntimeError(f"Failed to capture any frame for heading: {heading}")
 
-        frame = None
+            filename = os.path.join(SCAN_DIR, f"{heading}.jpg")
+            ok = cv2.imwrite(filename, frame)
+            if not ok:
+                raise RuntimeError(f"Failed to save image: {filename}")
 
-        for _ in range(WARMUP_FRAMES):
-            ret, frame = cap.read()
-            if not ret or frame is None:
-                raise RuntimeError(f"Failed to read frame for heading: {heading}")
-
-        filename = os.path.join(SCAN_DIR, f"{heading}.jpg")
-        ok = cv2.imwrite(filename, frame)
-
-        if not ok:
-            raise RuntimeError(f"Failed to save image: {filename}")
-        # Rotate except after last
-        if heading != HEADINGS[-1]:
-            call_move("rotate", 90.0, 0.3)
+            # Rotate between headings (skip after the last one)
+            if heading != HEADINGS[-1]:
+                call_move("rotate", 90.0, 0.3)
     finally:
         cap.release()
         print("\nAll captures complete.")
@@ -256,7 +269,6 @@ def get_three_slot_rois(img):
     bh, bw = band.shape[:2]
 
     slots = []
-
     for i in range(3):
         sx0 = int(i * bw / 3)
         sx1 = int((i + 1) * bw / 3)
@@ -280,7 +292,6 @@ def center_crop(img, frac=0.55):
 
     y0 = int((1.0 - frac) * 0.5 * h)
     y1 = int(h - y0)
-
     x0 = int((1.0 - frac) * 0.5 * w)
     x1 = int(w - x0)
 
@@ -304,7 +315,6 @@ def classify_floor_color_opencv(tile_bgr):
         return "?"
 
     roi = center_crop(tile_bgr, 0.55)
-
     if roi.size == 0:
         return "?"
 
@@ -320,7 +330,6 @@ def classify_floor_color_opencv(tile_bgr):
     LB = lab[:, :, 2]
 
     valid = (S >= 45) & (V >= 45)
-
     valid_ratio = float(np.count_nonzero(valid)) / float(valid.size)
 
     if valid_ratio < 0.10:
@@ -403,10 +412,8 @@ def detect_floor_colors_from_images():
 
 def clean_mask(mask):
     kernel = np.ones((5, 5), np.uint8)
-
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-
     return mask
 
 
@@ -423,14 +430,12 @@ def build_red_green_pink_masks(slot_bgr):
         (S >= RED_S_MIN) &
         (V >= RED_V_MIN)
     )
-
     red_mask_2 = (
         (H >= RED_HUE2_LOW) &
         (H <= RED_HUE2_HIGH) &
         (S >= RED_S_MIN) &
         (V >= RED_V_MIN)
     )
-
     red_mask = (red_mask_1 | red_mask_2).astype(np.uint8) * 255
 
     green_mask = (
@@ -469,38 +474,31 @@ def get_largest_valid_blob(mask, slot_shape):
 
     for cnt in contours:
         area = cv2.contourArea(cnt)
-
         if area <= 0:
             continue
 
         area_frac = area / float(slot_area)
-
         if area_frac < MIN_CONTOUR_AREA_FRAC:
             continue
-
         if area_frac > MAX_CONTOUR_AREA_FRAC:
             continue
 
         x, y, bw, bh = cv2.boundingRect(cnt)
-
         w_frac = bw / float(w)
         h_frac = bh / float(h)
 
         if w_frac < MIN_OBJECT_W_FRAC:
             continue
-
         if h_frac < MIN_OBJECT_H_FRAC:
             continue
 
         cx = x + bw / 2.0
         cy = y + bh / 2.0
-
         center_dx = abs(cx - w / 2.0) / max(1.0, w / 2.0)
         center_dy = abs(cy - h / 2.0) / max(1.0, h / 2.0)
 
         if center_dx > MAX_CENTER_OFFSET:
             continue
-
         if center_dy > MAX_CENTER_OFFSET:
             continue
 
@@ -541,19 +539,14 @@ def detect_one_object_slot(slot_bgr):
     # Reject fake red from pink/magenta floor tile.
     if pink_ratio >= PINK_REJECT_RATIO and red_ratio < 0.08:
         red_detected = False
-
     if pink_ratio > (red_ratio * 2.5) and red_ratio < 0.12:
         red_detected = False
 
     if red_detected and green_detected:
-        if red_ratio > green_ratio:
-            return "O"
-        else:
-            return "T"
+        return "O" if red_ratio > green_ratio else "T"
 
     if red_detected:
         return "O"
-
     if green_detected:
         return "T"
 
@@ -587,6 +580,7 @@ def detect_objects_from_images():
 # =========================================================
 
 def rotate_3x3_ccw(mat):
+    """Rotate a 3x3 matrix 90 degrees counter-clockwise."""
     return [
         [mat[0][2], mat[1][2], mat[2][2]],
         [mat[0][1], mat[1][1], mat[2][1]],
@@ -596,10 +590,8 @@ def rotate_3x3_ccw(mat):
 
 def rotate_n_ccw(mat, n):
     out = [row[:] for row in mat]
-
     for _ in range(n % 4):
         out = rotate_3x3_ccw(out)
-
     return out
 
 
@@ -609,13 +601,12 @@ def get_window_3x3(grid, center_r, center_c):
 
     if center_r - 1 < 0 or center_r + 1 >= rows:
         return None
-
     if center_c - 1 < 0 or center_c + 1 >= cols:
         return None
 
     raw = [
         [grid[center_r - 1][center_c - 1], grid[center_r - 1][center_c], grid[center_r - 1][center_c + 1]],
-        [grid[center_r][center_c - 1],     "A",                         grid[center_r][center_c + 1]],
+        [grid[center_r][center_c - 1],     "A",                          grid[center_r][center_c + 1]],
         [grid[center_r + 1][center_c - 1], grid[center_r + 1][center_c], grid[center_r + 1][center_c + 1]],
     ]
 
@@ -637,14 +628,10 @@ def score_match(local_3x3, window_3x3):
             lv = local_3x3[r][c]
             wv = window_3x3[r][c]
 
-            if lv == "A":
-                continue
-
-            if lv == "?":
+            if lv in ("A", "?"):
                 continue
 
             known += 1
-
             if lv == wv:
                 matches += 1
             else:
@@ -659,16 +646,13 @@ def score_match(local_3x3, window_3x3):
 
 
 def rotation_to_facing(rotation_ccw_deg):
-    """
-    Raw matrix convention.
-    """
+    """Map CCW rotation degrees to a compass facing string."""
     mapping = {
         0: "UP",
         90: "RIGHT",
         180: "DOWN",
         270: "LEFT",
     }
-
     return mapping[rotation_ccw_deg]
 
 
@@ -685,14 +669,12 @@ def physical_direction_fix(direction):
         "RIGHT": "RIGHT",
         "LEFT": "LEFT",
     }
-
     return mapping[direction]
 
 
 def rotate_direction(direction, steps_ccw):
     dirs = ["UP", "LEFT", "DOWN", "RIGHT"]
     idx = dirs.index(direction)
-
     return dirs[(idx + steps_ccw) % 4]
 
 
@@ -712,20 +694,17 @@ def get_scan_order(scan_start_local="FRONT", scan_sweep="cw", num_views=4):
 
     start_idx = base_order.index(scan_start_local)
     ordered = base_order[start_idx:] + base_order[:start_idx]
-
     return ordered[:num_views]
 
 
 def local_heading_to_map_direction(start_map_direction, local_heading):
     local_heading = local_heading.upper()
-
     local_steps_ccw = {
         "FRONT": 0,
         "LEFT": 1,
         "BACK": 2,
         "RIGHT": 3,
     }
-
     return rotate_direction(start_map_direction, local_steps_ccw[local_heading])
 
 
@@ -737,12 +716,10 @@ def get_final_camera_direction_after_scan(
 ):
     order = get_scan_order(scan_start_local, scan_sweep, num_views)
     final_local_heading = order[-1]
-
     final_map_direction = local_heading_to_map_direction(
         start_map_direction,
         final_local_heading
     )
-
     return final_local_heading, final_map_direction
 
 
@@ -753,7 +730,6 @@ def direction_to_char(direction):
         "DOWN": "D",
         "LEFT": "L",
     }
-
     return mapping[direction]
 
 
@@ -770,7 +746,6 @@ def find_best_match(local_color_3x3, big_grid):
         for center_r in range(1, rows - 1):
             for center_c in range(1, cols - 1):
                 window = get_window_3x3(big_grid, center_r, center_c)
-
                 if window is None:
                     continue
 
@@ -778,7 +753,6 @@ def find_best_match(local_color_3x3, big_grid):
 
                 if s["known"] < MIN_KNOWN_NEIGHBORS:
                     continue
-
                 if s["mismatches"] > MAX_MISMATCHES:
                     continue
 
@@ -803,7 +777,6 @@ def find_best_match(local_color_3x3, big_grid):
         key=lambda x: (x["score"], -x["mismatches"], x["known"]),
         reverse=True
     )
-
     return candidates[0]
 
 
@@ -837,7 +810,6 @@ def build_compact_17char(matched_biggrid_window, object_biggrid_perspective, fin
             out.append(floor_char + obj_char)
 
     out.append(direction_to_char(final_direction_physical))
-
     return "".join(out)
 
 
@@ -881,7 +853,6 @@ def map_location_and_build_compact(local_color_3x3, local_object_3x3):
 
 def main():
     ensure_clean_dirs()
-
     capture_scan_images()
 
     local_color_3x3 = detect_floor_colors_from_images()
@@ -893,7 +864,7 @@ def main():
     )
 
     with open(COMPACT_RESULT_FILE, "w") as f:
-        f.write(compact_result + "\n" + "\n")
+        f.write(compact_result + "\n\n")
 
     # Print only the compact result.
     print(compact_result)
