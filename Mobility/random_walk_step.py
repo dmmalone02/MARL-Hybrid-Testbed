@@ -133,7 +133,7 @@ class RandomWalkStep(Node):
         self._in_backward = True
 
     def pick_move(self):
-        move_param = self.get_parameter('move').value
+        move_param = str(self.get_parameter('move').value).strip('"')
         self.get_logger().info(f"move_param is: '{move_param}'")
 
         if move_param == 'random':
@@ -194,7 +194,7 @@ class RandomWalkStep(Node):
 
         if self.state == State.MOVE_FORWARD:
             if self.start_position is None:
-                self.r_reset_linear()
+                self._reset_linear()
 
             if self.distance_traveled < self.target_distance:
                 self._publish_linear(self.speed)
@@ -267,3 +267,4 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
