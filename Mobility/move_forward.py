@@ -27,7 +27,6 @@ class MoveForward(Node):
         self.declare_parameter('distance', 0.5)   # meters
         self.declare_parameter('speed', 0.1)      # m/s
 
-        xx = self.get_parameter('xx').value
         self.target_distance = float(self.get_parameter('distance').value)
         self.speed = abs(float(self.get_parameter('speed').value))
 
