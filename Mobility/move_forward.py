@@ -24,7 +24,6 @@ class MoveForward(Node):
         super().__init__('move_forward')
 
         # Declare parameters (CLI configurable)
-        self.declare_parameter('xx')  # default robot nameeither 01 (for TB Lite) or 02 (for TB Standard)
         self.declare_parameter('distance', 0.5)   # meters
         self.declare_parameter('speed', 0.1)      # m/s
 
@@ -33,10 +32,10 @@ class MoveForward(Node):
         self.speed = abs(float(self.get_parameter('speed').value))
 
         # ROS interfaces
-        self.cmd_pub = self.create_publisher(Twist, f'/tb_{xx}/cmd_vel_unstamped', 10)
+        self.cmd_pub = self.create_publisher(Twist, f'/tb_02/cmd_vel_unstamped', 10)
         self.odom_sub = self.create_subscription(
             Odometry,
-            '/tb_{xx}/odom',
+            '/tb_02/odom',
             self.odom_callback,
             10
         )
