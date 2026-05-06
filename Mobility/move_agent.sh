@@ -18,10 +18,9 @@
 # ── Configuration ────────────────────────────────────────────────────────────
 REMOTE_USER="${REMOTE_USER:-ubuntu}"
 REMOTE_HOST="${REMOTE_HOST:-192.168.185.3}"
-ROBOT_ID="${ROBOT_ID:-std}"                          # passed as -p xx:= to ROS nodes
 ROS_SETUP="${ROS_SETUP:-/opt/ros/jazzy/setup.bash}"
 WS_SETUP="${WS_SETUP:-~/tb4_motion_ws/install/setup.bash}"
-PKG_NAME="${PKG_NAME:-tb4_motion}"
+PKG_NAME="${PKG_NAME:-turtlebot4std}"
 # ─────────────────────────────────────────────────────────────────────────────
 
 usage() {
@@ -65,13 +64,12 @@ case "$COMMAND" in
         SPEED="$3"
 
         echo "Sending move_forward to ${REMOTE_USER}@${REMOTE_HOST}"
-        echo "  robot=${ROBOT_ID}, distance=${DISTANCE} m, speed=${SPEED} m/s"
+        echo "distance=${DISTANCE} m, speed=${SPEED} m/s"
 
         ssh "${REMOTE_USER}@${REMOTE_HOST}" "bash -ic '
             source ${ROS_SETUP} && \
             source ${WS_SETUP} && \
             ros2 run ${PKG_NAME} move_forward --ros-args \
-                -p xx:=${ROBOT_ID} \
                 -p distance:=${DISTANCE} \
                 -p speed:=${SPEED}'"
         ;;
@@ -86,13 +84,12 @@ case "$COMMAND" in
         ANGULAR_SPEED="$3"
 
         echo "Sending rotate to ${REMOTE_USER}@${REMOTE_HOST}"
-        echo "  robot=${ROBOT_ID}, angle=${ANGLE_DEG} deg, angular_speed=${ANGULAR_SPEED} rad/s"
+        echo "angle=${ANGLE_DEG} deg, angular_speed=${ANGULAR_SPEED} rad/s"
 
         ssh "${REMOTE_USER}@${REMOTE_HOST}" "bash -ic '
             source ${ROS_SETUP} && \
             source ${WS_SETUP} && \
             ros2 run ${PKG_NAME} rotate --ros-args \
-                -p xx:=${ROBOT_ID} \
                 -p angle_deg:=${ANGLE_DEG} \
                 -p angular_speed:=${ANGULAR_SPEED}'"
         ;;
