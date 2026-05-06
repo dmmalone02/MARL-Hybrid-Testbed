@@ -258,13 +258,13 @@ class RandomWalkStep(Node):
                 self._stop()
                 if getattr(self, '_in_backward', False):
                     # 180° flip done — now drive forward
-                    self.get_logger().info("  ↳ 180° flip done → driving forward")
+                    self.get_logger().info("180° flip done → driving forward")
                     self._in_backward = False
                     self._reset_linear()
                     self.state = State.MOVE_BACK_FWD
                 else:
                     # turn left/right — drive forward after rotating
-                    self.get_logger().info("  ↳ Rotation done → driving forward")
+                    self.get_logger().info("Rotation done → driving forward")
                     self._reset_linear()
                     self.state = State.MOVE_FORWARD
             return
@@ -275,7 +275,7 @@ class RandomWalkStep(Node):
                 self._publish_linear(self.speed)
             else:
                 self._stop()
-                self.get_logger().info("✔ Backward complete.")
+                self.get_logger().info("Backward complete.")
                 self._begin_pause()
             return
 
