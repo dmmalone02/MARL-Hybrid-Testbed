@@ -152,23 +152,23 @@ class RandomWalkStep(Node):
         self.angle_traveled  = 0.0
 
     def start_move_forward(self):
-        self.get_logger().info(f"▶ FORWARD  {self.target_distance:.2f} m")
+        self.get_logger().info(f"FORWARD  {self.target_distance:.2f} m")
         self._reset_linear()
         self.state = State.MOVE_FORWARD
 
     def start_turn_left(self):
-        self.get_logger().info("↺ TURN LEFT  90 °")
+        self.get_logger().info("TURN LEFT  90 °")
         self._reset_rotation(math.radians(90.0))
         self.state = State.ROTATE
 
     def start_turn_right(self):
-        self.get_logger().info("↻ TURN RIGHT  90 °")
+        self.get_logger().info("TURN RIGHT  90 °")
         self._reset_rotation(math.radians(-90.0))
         self.state = State.ROTATE
 
     def start_move_backward(self):
         """Backward = rotate 180° → drive forward (stays facing new direction)."""
-        self.get_logger().info("◀ BACKWARD  (flip → drive)")
+        self.get_logger().info("BACKWARD  (flip → drive)")
         self._reset_rotation(math.radians(179.0))
         self.state = State.ROTATE
         self._in_backward = True   # flag so ROTATE knows to drive next
@@ -298,7 +298,7 @@ class RandomWalkStep(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = RandomWalk()
+    node = RandomWalkStep()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
