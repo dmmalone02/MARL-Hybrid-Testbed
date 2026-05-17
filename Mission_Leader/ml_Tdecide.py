@@ -30,8 +30,13 @@ Tiles are scanned row by row, top to bottom, left to right.
 import sys
 import math
 import argparse
+import os
 
 # Target coords are passed via --target X Y from the mission leader script.
+
+# ── Results directory (must match mapingfromtxtfile.py RESULTS_DIR) ──────────
+RESULTS_DIR = "Results"
+# ────────────────────────────────────────────────────────────────────────────
 
 DIRECTION_VECTORS = {
     'U': (0, -1),
@@ -142,10 +147,13 @@ def build_scan_grid(tiles, agent_x, agent_y):
 def decide_action(agent_x, agent_y, facing, target_x, target_y, scan_grid):
     """Decide the next movement action toward the target."""
 
-    # Stop if the target tile is visible in the scan
-    for tile in scan_grid.values():
-        if tile['content'] == 'Target':
-            return None, "Target detected in scan range — holding position!"
+    # Stop only if the target tile is directly adjacent (N/S/E/W) —
+    # those are the only tiles the agent can actually step onto next.
+    for direction, (vx, vy) in DIRECTION_VECTORS.items():
+        nx, ny = agent_x + vx, agent_y + vy
+        tile = scan_grid.get((nx, ny))
+        if tile and tile['content'] == 'Target':
+            return None, f"Target is directly adjacent ({direction}) — holding position!"
 
     dx = target_x - agent_x
     dy = target_y - agent_y
@@ -214,7 +222,7 @@ def print_scan_grid(scan_grid, agent_x, agent_y, target_x, target_y, rows, cols)
 
 def process_node(ep, node, target_x, target_y):
     """Load and process one agent node. Returns (action_str, error_str)."""
-    filepath = f"compact_map_result_Ep_{ep}_Node_{node}.txt"
+    filepath = os.path.join(RESULTS_DIR, f"compact_map_result_Ep_{ep}_Node_{node}.txt")
     log(f"\n{'='*48}")
     log(f"  Node {node} | File: {filepath}")
     log(f"{'='*48}")

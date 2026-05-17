@@ -58,7 +58,7 @@ BIG_GRID = [
 ]
 
 MIN_KNOWN_NEIGHBORS = 5
-MAX_MISMATCHES = 3
+MAX_MISMATCHES = 1
 
 SCAN_START_LOCAL = "FRONT"
 SCAN_SWEEP = "cw"
@@ -231,7 +231,8 @@ def find_best_match(local_color_3x3, big_grid):
 # =========================================================
 
 def physical_direction_fix(direction):
-    return {"UP":"DOWN","DOWN":"UP","RIGHT":"RIGHT","LEFT":"LEFT"}[direction]
+    # Camera faces the same direction as the agent — no inversion needed
+    return direction
 
 
 def rotate_direction(direction, steps_ccw):
@@ -263,10 +264,23 @@ def get_final_camera_direction_after_scan(
     scan_sweep="cw",
     num_views=4
 ):
-    order            = get_scan_order(scan_start_local, scan_sweep, num_views)
-    final_local      = order[-1]
-    final_map        = local_heading_to_map_direction(
-                           start_map_direction, final_local)
+    order       = get_scan_order(scan_start_local, scan_sweep, num_views)
+    final_local = order[-1]
+
+    # Direction the camera is at after the last scan view
+    final_map_after_last_view = local_heading_to_map_direction(
+        start_map_direction, final_local)
+
+    # After scanning, the agent rotates back one step in the opposite direction
+    # to return to its resting pose. CW scan = rotate back one step CW from
+    # the last scan position. One CW step = 3 CCW steps in rotate_direction.
+    if scan_sweep == "cw":
+        rotate_back_ccw_steps = 3   # i.e. one step clockwise
+    else:
+        rotate_back_ccw_steps = 1   # i.e. one step counter-clockwise
+
+    final_map = rotate_direction(final_map_after_last_view, rotate_back_ccw_steps)
+
     return final_local, final_map
 
 
@@ -347,9 +361,9 @@ def main():
     # --node : agent node ID (e.g. 120 for agent 1, 121 for agent 2)
     parser = argparse.ArgumentParser()
     
-    parser.add_argument("--ep",   type=int, default="",
+    parser.add_argument("--ep",   type=int, required=True,
                         help="Episode number")
-    parser.add_argument("--node", type=int, default="",
+    parser.add_argument("--node", type=int, required=True,
                         help="Agent node ID (e.g. 120)")
                         
     args = parser.parse_args()
@@ -360,18 +374,10 @@ def main():
     os.makedirs(RESULTS_DIR, exist_ok=True)
     os.makedirs(SENSING_DIR, exist_ok=True)
 
-    # Input:  Ep_{ep}_Node_{node}.txt
-    # Output: results/compact_map_result_{node}.txt
-    if args.node:
-        compact_local_file = os.path.join(SENSING_DIR, f"Ep_{ep}_Node_{node}.txt")
-        compact_map_file   = os.path.join(
-            RESULTS_DIR, f"compact_map_result_Ep_{ep}_Node_{node}.txt")
-    else:
-        # Fallback: original filenames if no node given
-        compact_local_file = os.path.join(
-            SENSING_DIR, "Ep_1_Node_120.txt")
-        compact_map_file   = os.path.join(
-            RESULTS_DIR, "compact_map_result.txt")
+    # Input:  Sensing_Files/Ep_{ep}_Node_{node}.txt
+    # Output: Results/compact_map_result_Ep_{ep}_Node_{node}.txt
+    compact_local_file = os.path.join(SENSING_DIR, f"Ep_{ep}_Node_{node}.txt")
+    compact_map_file   = os.path.join(RESULTS_DIR, f"compact_map_result_Ep_{ep}_Node_{node}.txt")
 
     compact_map_result, row, col = map_location_from_compact_local(
         compact_local_file
