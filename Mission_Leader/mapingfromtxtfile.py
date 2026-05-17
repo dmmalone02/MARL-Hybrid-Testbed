@@ -363,8 +363,7 @@ def main():
     # Input:  Ep_{ep}_Node_{node}.txt
     # Output: results/compact_map_result_{node}.txt
     if args.node:
-        compact_local_file = os.path.join
-            (SENSING_DIR, f"Ep_{ep}_Node_{node}.txt")
+        compact_local_file = os.path.join(SENSING_DIR, f"Ep_{ep}_Node_{node}.txt")
         compact_map_file   = os.path.join(
             RESULTS_DIR, f"compact_map_result_Ep_{ep}_Node_{node}.txt")
     else:
