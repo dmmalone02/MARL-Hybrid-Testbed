@@ -26,8 +26,8 @@ AGENT_HOSTS=("10.1.1.120")
 
 # ── Timing (seconds) ──────────────────────────────────────────────────────────
 WAIT_RX_STARTUP=10      # Time for Rx flowgraph to start
-WAIT_AGENT_TX=40        # Time for agent to finish moving and start transmitting
-WAIT_ML_RX=80           # Time for ML Rx to receive full transmission
+WAIT_ML_RX=80           # Time for ML Rx to fully receive transmission
+                        # (agent sensing+TX is done before SSH returns)
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -85,22 +85,21 @@ sleep "$WAIT_RX_STARTUP"
 for ((ep=1; ep<=N; ep++)); do
     log_info "======== Episode $ep / $N ========"
 
-    # Trigger all agents — sensing string printed to terminal, SSH noise to log
+    # Trigger all agents — wait for completion, capture sensing string
     log_only "Triggering agents..."
     for HOST in "${AGENT_HOSTS[@]}"; do
-        SENSE_OUTPUT=$(ssh -q "${REMOTE_USER}@${HOST}" "bash -ic './move_tx_move.sh $ep'" 2>> "$LOG_FILE")
+        AGENT_OUTPUT=$(ssh -q "${REMOTE_USER}@${HOST}" "bash -ic './move_tx_move.sh $ep'" 2>> "$LOG_FILE")
         if [ $? -ne 0 ]; then
             log_error "Failed to trigger agent @ $HOST on episode $ep"
         else
-            log_info "  Agent @ $HOST sensing: $SENSE_OUTPUT"
-            echo "$SENSE_OUTPUT" >> "$LOG_FILE"
+            # Extract the sensing string line tagged with [SENSING]
+            SENSE_STR=$(echo "$AGENT_OUTPUT" | grep '^\[SENSING\]' | sed 's/^\[SENSING\] //')
+            log_info "  Agent @ $HOST sensing: $SENSE_STR"
+            echo "$AGENT_OUTPUT" >> "$LOG_FILE"
         fi
-    done &
+    done
 
-    log_only "Waiting ${WAIT_AGENT_TX}s for agents to finish moving and start TX..."
-    sleep "$WAIT_AGENT_TX"
-
-    log_only "Waiting ${WAIT_ML_RX}s for ML Rx to receive transmission..."
+    log_only "Waiting ${WAIT_ML_RX}s for ML Rx to fully receive transmission..."
     sleep "$WAIT_ML_RX"
 
     # Run ML script — stdout (location + decision) shown on terminal and logged
