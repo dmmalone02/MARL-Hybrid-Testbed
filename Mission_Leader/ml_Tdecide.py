@@ -176,9 +176,23 @@ def decide_action(agent_x, agent_y, facing, target_x, target_y, scan_grid):
             return True  # Outside scan range — assume passable
         return tile['content'] != 'Obstacle' and tile['color'] != 'Border'
 
+    def manhattan_after_move(direction):
+        vx, vy = DIRECTION_VECTORS[direction]
+        return abs((agent_x + vx) - target_x) + abs((agent_y + vy) - target_y)
+
     all_dirs = ['U', 'D', 'L', 'R']
-    priority = [ideal_dir, alt_dir] + [d for d in all_dirs if d not in (ideal_dir, alt_dir)]
-    chosen_dir = next((d for d in priority if tile_is_passable(d)), ideal_dir)
+    passable_dirs = [d for d in all_dirs if tile_is_passable(d)]
+
+    if passable_dirs:
+        # Pick the passable direction that gets closest to target.
+        # On ties, use priority order (ideal -> alt -> rest) to break them
+        # consistently rather than defaulting to an arbitrary list order.
+        priority = [ideal_dir, alt_dir] + [d for d in all_dirs if d not in (ideal_dir, alt_dir)]
+        priority_passable = [d for d in priority if d in passable_dirs]
+        best_dist = min(manhattan_after_move(d) for d in priority_passable)
+        chosen_dir = next(d for d in priority_passable if manhattan_after_move(d) == best_dist)
+    else:
+        chosen_dir = ideal_dir  # Fully surrounded — fallback
 
     if chosen_dir == facing:
         action = 'forward'
