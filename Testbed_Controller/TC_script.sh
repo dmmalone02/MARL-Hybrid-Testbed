@@ -2,11 +2,18 @@
 
 # ── Mission parameters ────────────────────────────────────────────────────────
 # Change these here, or override by passing arguments:
-#   ./TC_script.sh <episodes> <target_x> <target_y>
-#   Example: ./TC_script.sh 3 5 5
+#   ./TC_script.sh <episodes> <ml_script> <target_x> <target_y>
+#   Example: ./TC_script.sh 3 ML_Script_T.sh 5 5
+#            ./TC_script.sh 3 ML_Script_R.sh       (no target needed)
+#
+# ML script options:
+#   ML_Script_T.sh  — target-directed, needs target_x and target_y
+#   ML_Script_R.sh  — random walk, no target needed
+#   ML_Script_M.sh  — multi-agent, no target needed
 N=${1:-1}
-TARGET_X=${2:-5}
-TARGET_Y=${3:-5}
+ML_SCRIPT=${2:-ML_Script_T.sh}
+TARGET_X=${3:-5}
+TARGET_Y=${4:-5}
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Hosts ─────────────────────────────────────────────────────────────────────
@@ -26,65 +33,96 @@ WAIT_ML_RX=80           # Time for ML Rx to receive full transmission
 # ── Logging ───────────────────────────────────────────────────────────────────
 LOG_FILE="TC_mission_$(date +%Y%m%d_%H%M%S).log"
 
-log() {
+# log_only  — goes to log file only (silent on terminal)
+# log_error — goes to both terminal and log file (errors only on terminal)
+# log_info  — goes to both terminal and log file (key mission steps)
+log_only() {
+    echo "[$(date '+%H:%M:%S')] $*" >> "$LOG_FILE"
+}
+log_error() {
+    local msg="[$(date '+%H:%M:%S')] [ERROR] $*"
+    echo "$msg"
+    echo "$msg" >> "$LOG_FILE"
+}
+log_info() {
     local msg="[$(date '+%H:%M:%S')] $*"
     echo "$msg"
     echo "$msg" >> "$LOG_FILE"
 }
 # ─────────────────────────────────────────────────────────────────────────────
 
-log "================================================"
-log "Mission start | Episodes: $N | Target: ($TARGET_X, $TARGET_Y)"
-log "Agents: ${AGENT_HOSTS[*]}"
-log "================================================"
+# ── Build ML script call based on which script is selected ───────────────────
+needs_target() {
+    case "$1" in
+        ML_Script_T.sh) return 0 ;;
+        *)              return 1 ;;
+    esac
+}
+# ─────────────────────────────────────────────────────────────────────────────
 
-log "Starting ML Rx flowgraph..."
-ssh "${REMOTE_USER}@${REMOTE_HOST_ML}" \
-    "bash -c 'nohup python3 /home/ucanlab/Mission_Leader/Integrated_Comms_Rx.py > rx.log 2>&1 &'"
+log_info "================================================"
+log_info "Mission start"
+log_info "  Episodes  : $N"
+log_info "  ML script : $ML_SCRIPT"
+needs_target "$ML_SCRIPT" && log_info "  Target    : ($TARGET_X, $TARGET_Y)"
+log_info "  Agents    : ${AGENT_HOSTS[*]}"
+log_info "  Log file  : $LOG_FILE"
+log_info "================================================"
+
+# ── Start Rx flowgraph ────────────────────────────────────────────────────────
+log_info "Starting ML Rx flowgraph..."
+ssh -q "${REMOTE_USER}@${REMOTE_HOST_ML}" \
+    "bash -c 'nohup python3 /home/ucanlab/Mission_Leader/Integrated_Comms_Rx.py > rx.log 2>&1 &'" \
+    >> "$LOG_FILE" 2>&1
 if [ $? -ne 0 ]; then
-    log "[ERROR] Failed to start Rx flowgraph on ML — aborting mission."
+    log_error "Failed to start Rx flowgraph on ML — aborting mission."
     exit 1
 fi
-log "Rx flowgraph started. Waiting ${WAIT_RX_STARTUP}s for startup..."
+log_only "Rx flowgraph started. Waiting ${WAIT_RX_STARTUP}s..."
 sleep "$WAIT_RX_STARTUP"
 
+# ── Episode loop ──────────────────────────────────────────────────────────────
 for ((ep=1; ep<=N; ep++)); do
-    log ""
-    log "======== Episode $ep / $N | Target ($TARGET_X, $TARGET_Y) ========"
+    log_info "======== Episode $ep / $N ========"
 
-    # ── Trigger all agents ───────────────────────────────────────────────────
-    log "Triggering agents..."
+    # Trigger all agents — sensing string printed to terminal, SSH noise to log
+    log_only "Triggering agents..."
     for HOST in "${AGENT_HOSTS[@]}"; do
-        log "  Starting agent @ $HOST"
-        ssh "${REMOTE_USER}@${HOST}" "bash -ic './move_tx_move.sh $ep'" &
+        SENSE_OUTPUT=$(ssh -q "${REMOTE_USER}@${HOST}" "bash -ic './move_tx_move.sh $ep'" 2>> "$LOG_FILE")
         if [ $? -ne 0 ]; then
-            log "  [WARN] SSH to agent @ $HOST may have failed"
+            log_error "Failed to trigger agent @ $HOST on episode $ep"
+        else
+            log_info "  Agent @ $HOST sensing: $SENSE_OUTPUT"
+            echo "$SENSE_OUTPUT" >> "$LOG_FILE"
         fi
-    done
+    done &
 
-    # ── Wait for agents to finish moving and start transmitting ──────────────
-    log "Waiting ${WAIT_AGENT_TX}s for agents to finish moving and start TX..."
+    log_only "Waiting ${WAIT_AGENT_TX}s for agents to finish moving and start TX..."
     sleep "$WAIT_AGENT_TX"
 
-    # ── Wait for ML Rx to receive full transmission ──────────────────────────
-    log "Waiting ${WAIT_ML_RX}s for ML Rx to receive transmission..."
+    log_only "Waiting ${WAIT_ML_RX}s for ML Rx to receive transmission..."
     sleep "$WAIT_ML_RX"
 
-    # ── Run ML localization and decision ─────────────────────────────────────
-    log "Running ML script (localize + decide)..."
-    ssh "${REMOTE_USER}@${REMOTE_HOST_ML}" \
-        "bash /home/ucanlab/Mission_Leader/ML_Script.sh $ep $TARGET_X $TARGET_Y"
-    ML_STATUS=$?
-    if [ $ML_STATUS -ne 0 ]; then
-        log "[WARN] ML script exited with status $ML_STATUS on episode $ep"
+    # Run ML script — stdout (location + decision) shown on terminal and logged
+    log_only "Running $ML_SCRIPT..."
+    if needs_target "$ML_SCRIPT"; then
+        ssh -q "${REMOTE_USER}@${REMOTE_HOST_ML}" \
+            "bash /home/ucanlab/Mission_Leader/$ML_SCRIPT $ep $TARGET_X $TARGET_Y" \
+            2>> "$LOG_FILE" | tee -a "$LOG_FILE"
     else
-        log "ML script completed successfully."
+        ssh -q "${REMOTE_USER}@${REMOTE_HOST_ML}" \
+            "bash /home/ucanlab/Mission_Leader/$ML_SCRIPT $ep" \
+            2>> "$LOG_FILE" | tee -a "$LOG_FILE"
+    fi
+    if [ $? -ne 0 ]; then
+        log_error "$ML_SCRIPT failed on episode $ep — check $LOG_FILE for details."
+    else
+        log_only "$ML_SCRIPT completed successfully."
     fi
 
-    log "======== Episode $ep complete ========"
+    log_info "======== Episode $ep complete ========"
 done
 
-log ""
-log "================================================"
-log "Mission complete. Log saved to $LOG_FILE"
-log "================================================"
+log_info "================================================"
+log_info "Mission complete. Full log: $LOG_FILE"
+log_info "================================================"
