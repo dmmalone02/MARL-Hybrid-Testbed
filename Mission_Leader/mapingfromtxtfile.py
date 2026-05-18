@@ -70,10 +70,10 @@ BIG_GRID = [
 # BIG_GRID col:
 #          0    1    2    3    4    5    6    7    8    9    10
 
-# Edge cells have fewer real color neighbors. A corner only has 3 valid in-grid
-# neighbors, so this must be 3 if corners are allowed.
-MIN_KNOWN_NEIGHBORS = 3
-MAX_MISMATCHES = 1
+# Since the agent will mostly operate in the interior, this prioritizes
+# stable interior localization while still allowing some camera error.
+MIN_KNOWN_NEIGHBORS = 5
+MAX_MISMATCHES = 2
 
 SCAN_START_LOCAL = "FRONT"
 SCAN_SWEEP = "cw"
@@ -195,7 +195,16 @@ def score_match(local_3x3, window_3x3):
 
 
 def rotation_to_facing(rotation_ccw_deg):
-    return {0: "UP", 90: "RIGHT", 180: "DOWN", 270: "LEFT"}[rotation_ccw_deg]
+    """
+    Convert the rotation used to align the local scan to BIG_GRID into
+    the agent's actual facing direction.
+
+    Matrix rotation is counter-clockwise, but if the agent is physically
+    facing RIGHT, the local scan must be rotated 270 degrees CCW to align
+    with the BIG_GRID. If the agent is physically facing LEFT, the local
+    scan must be rotated 90 degrees CCW.
+    """
+    return {0: "UP", 90: "LEFT", 180: "DOWN", 270: "RIGHT"}[rotation_ccw_deg]
 
 
 def find_best_match(local_color_3x3, big_grid):

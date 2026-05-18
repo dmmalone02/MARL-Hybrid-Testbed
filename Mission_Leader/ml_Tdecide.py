@@ -20,7 +20,7 @@ File format:
 
 Tile string:
   - Every 2 characters = one tile: <Color><Content>
-      Colors : Y=Yellow, M=Magenta, B=Blue, P=Purple, ?=Border (impassable)
+      Colors : Y=Yellow, M=Magenta, B=Blue, P=Purple, X=Border, ?=Border
       Content: E=Empty, O=Obstacle, T=Target
   - Last single character = agent facing direction: L=Left, R=Right, U=Up, D=Down
 
@@ -50,7 +50,8 @@ COLOR_MAP = {
     'M': 'Magenta',
     'B': 'Blue',
     'P': 'Purple',
-    '?': 'Border',   # No colour — grid boundary, impassable
+    'X': 'Border',   # X border from mapingfromtxtfile.py / red border sensing
+    '?': 'Border',   # Unknown/no colour treated as grid boundary, impassable
 }
 
 CONTENT_MAP = {
@@ -194,6 +195,10 @@ def decide_action(agent_x, agent_y, facing, target_x, target_y, scan_grid):
     else:
         chosen_dir = ideal_dir  # Fully surrounded — fallback
 
+    log(f"  Desired grid direction : {chosen_dir}")
+    log(f"  Current facing         : {facing}")
+    log(f"  Direction delta check  : forward if same, left/right if one turn away, backward if opposite")
+
     if chosen_dir == facing:
         action = 'forward'
     elif chosen_dir == TURN_LEFT[facing]:
@@ -255,6 +260,7 @@ def process_node(ep, node, target_x, target_y):
     log(f"  Agent facing   : {facing} ({FACING_NAMES[facing]})")
     log(f"  Target position: ({target_x}, {target_y})")
     log(f"  Tiles scanned  : {len(tiles)}")
+    log("  Facing check   : ml_Tdecide.py reads facing from the LAST character of the compact tile string.")
 
     scan_grid, rows, cols = build_scan_grid(tiles, agent_x, agent_y)
     skip_centre = (rows * cols - 1 == len(tiles))
