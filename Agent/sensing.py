@@ -9,11 +9,10 @@ import numpy as np
 # =========================================================
 # Pipeline:
 #   1. Capture 4 still images: front, right, back, left
-#   2. Detect floor colors: P/Y/B/M
+#   2. Detect floor colors: P/Y/B/M/X
 #   3. Detect objects: green target, red obstacle
-#   4. Match color 3x3 into BIG_GRID
-#   5. Rotate object grid into BIG_GRID perspective
-#   6. Save and print compact_map_result.txt only
+#   4. Build compact local sensing result
+#   5. Save and print compact_local_map_result.txt only
 # =========================================================
 
 # =========================================================
@@ -65,6 +64,7 @@ HEADING_TO_POSITIONS = {
 # =========================================================
 # Green box = Target
 # Red box   = Obstacle
+# Red border tile = X floor / obstacle boundary
 # Pink/magenta tile is rejected as fake red.
 # =========================================================
 
@@ -94,15 +94,13 @@ MIN_OBJECT_H_FRAC = 0.08
 
 MAX_CENTER_OFFSET = 0.95
 
-# =========================================================
-# BIG GRID
-# =========================================================
-# P = Purple
-# Y = Yellow
-# B = Blue
-# M = Pink/Magenta
-# X = blocked/unused
+# Red physical border tile handling.
+# If a floor slot is mostly red, classify its floor color as X so
+# localization can match the X border in mapingfromtxtfile.py.
+RED_BORDER_FLOOR_RATIO = 0.35
 
+# If a slot is mostly red, also treat it as blocked for movement/object output.
+RED_BORDER_OBJECT_RATIO = 0.35
 
 # =========================================================
 # GENERAL HELPERS
@@ -120,13 +118,16 @@ def ensure_clean_dirs():
     if os.path.exists(COMPACT_RESULT_FILE):
         os.remove(COMPACT_RESULT_FILE)
 
+
 def call_move(cmd, angle, speed):
     print(f"[MOVE] {cmd} {angle} deg @ {speed}")
     subprocess.run(["./move_agent.sh", cmd, str(angle), str(speed)])
 
+
 def is_still(prev_gray, gray):
     diff = cv2.absdiff(prev_gray, gray)
     return np.mean(diff) < MOTION_THRESH
+
 
 def make_empty_local_grid():
     return {
@@ -213,9 +214,7 @@ def capture_scan_images():
 
                 if time.time() - start_time > 10:
                     print(f"Stillness timeout for heading {heading}, capturing image anyway.")
-                    capture_frame(heading)
                     break
-
 
             print("Captured.")
 
@@ -234,6 +233,8 @@ def capture_scan_images():
         print("\nAll captures complete. Restoring original orientation...")
         call_move("rotate", -90.0, 0.3)
         time.sleep(0.1)
+
+
 # =========================================================
 # ROI EXTRACTION
 # =========================================================
@@ -286,12 +287,15 @@ def center_crop(img, frac=0.55):
 
 def classify_floor_color_opencv(tile_bgr):
     """
-    Detects only fixed floor colors:
+    Detects floor colors:
         P = purple
         Y = yellow
         B = blue
         M = pink/magenta
-    Red and green are reserved for objects.
+        X = red physical border tile
+
+    Red and green are still used in object detection, but a mostly red FLOOR
+    slot is treated as X so edge localization can match the X border.
     """
     if tile_bgr is None or tile_bgr.size == 0:
         return "?"
@@ -316,6 +320,27 @@ def classify_floor_color_opencv(tile_bgr):
 
     if valid_ratio < 0.10:
         return "?"
+
+    # Red physical border detection.
+    # This happens before yellow/blue/purple/magenta classification so
+    # strong red does not accidentally become a random floor color.
+    red_border_mask_1 = (
+        (H >= RED_HUE1_LOW) &
+        (H <= RED_HUE1_HIGH) &
+        (S >= RED_S_MIN) &
+        (V >= RED_V_MIN)
+    )
+    red_border_mask_2 = (
+        (H >= RED_HUE2_LOW) &
+        (H <= RED_HUE2_HIGH) &
+        (S >= RED_S_MIN) &
+        (V >= RED_V_MIN)
+    )
+    red_border_mask = (red_border_mask_1 | red_border_mask_2) & valid
+    red_border_ratio = float(np.count_nonzero(red_border_mask)) / float(valid.size)
+
+    if red_border_ratio >= RED_BORDER_FLOOR_RATIO:
+        return "X"
 
     yellow_mask = ((H >= 18) & (H <= 38) & valid)
     blue_mask = ((H >= 95) & (H <= 135) & valid)
@@ -499,7 +524,7 @@ def detect_one_object_slot(slot_bgr):
     """
     Return:
         T = green target
-        O = red obstacle
+        O = red obstacle / red border
         E = empty
         ? = uncertain
     """
@@ -514,6 +539,11 @@ def detect_one_object_slot(slot_bgr):
 
     red_blob = get_largest_valid_blob(red_mask, slot_bgr.shape)
     green_blob = get_largest_valid_blob(green_mask, slot_bgr.shape)
+
+    # A mostly red slot is the physical boundary, so movement should treat it
+    # as blocked even if the contour filter is not perfect.
+    if red_ratio >= RED_BORDER_OBJECT_RATIO:
+        return "O"
 
     red_detected = red_ratio >= MIN_OBJECT_RATIO and red_blob is not None
     green_detected = green_ratio >= MIN_OBJECT_RATIO and green_blob is not None
@@ -556,277 +586,6 @@ def detect_objects_from_images():
 
     return local_grid_to_matrix(local_grid)
 
-"""
-# =========================================================
-# STEP 4: MAP LOCATION
-# =========================================================
-
-def rotate_3x3_ccw(mat):
-    #Rotate a 3x3 matrix 90 degrees counter-clockwise.
-    return [
-        [mat[0][2], mat[1][2], mat[2][2]],
-        [mat[0][1], mat[1][1], mat[2][1]],
-        [mat[0][0], mat[1][0], mat[2][0]],
-    ]
-
-
-def rotate_n_ccw(mat, n):
-    out = [row[:] for row in mat]
-    for _ in range(n % 4):
-        out = rotate_3x3_ccw(out)
-    return out
-
-
-def get_window_3x3(grid, center_r, center_c):
-    rows = len(grid)
-    cols = len(grid[0])
-
-    if center_r - 1 < 0 or center_r + 1 >= rows:
-        return None
-    if center_c - 1 < 0 or center_c + 1 >= cols:
-        return None
-
-    raw = [
-        [grid[center_r - 1][center_c - 1], grid[center_r - 1][center_c], grid[center_r - 1][center_c + 1]],
-        [grid[center_r][center_c - 1],     "A",                          grid[center_r][center_c + 1]],
-        [grid[center_r + 1][center_c - 1], grid[center_r + 1][center_c], grid[center_r + 1][center_c + 1]],
-    ]
-
-    for r in range(3):
-        for c in range(3):
-            if raw[r][c] == "X":
-                return None
-
-    return raw
-
-
-def score_match(local_3x3, window_3x3):
-    known = 0
-    matches = 0
-    mismatches = 0
-
-    for r in range(3):
-        for c in range(3):
-            lv = local_3x3[r][c]
-            wv = window_3x3[r][c]
-
-            if lv in ("A", "?"):
-                continue
-
-            known += 1
-            if lv == wv:
-                matches += 1
-            else:
-                mismatches += 1
-
-    return {
-        "known": known,
-        "matches": matches,
-        "mismatches": mismatches,
-        "score": matches,
-    }
-
-
-def rotation_to_facing(rotation_ccw_deg):
-    #Map CCW rotation degrees to a compass facing string.""
-    mapping = {
-        0: "UP",
-        90: "RIGHT",
-        180: "DOWN",
-        270: "LEFT",
-    }
-    return mapping[rotation_ccw_deg]
-
-
-def physical_direction_fix(direction):
-    
-    Physical floor correction:
-        raw UP   -> physical DOWN
-        raw DOWN -> physical UP
-        RIGHT/LEFT unchanged
-    ""
-    mapping = {
-        "UP": "DOWN",
-        "DOWN": "UP",
-        "RIGHT": "RIGHT",
-        "LEFT": "LEFT",
-    }
-    return mapping[direction]
-
-
-def rotate_direction(direction, steps_ccw):
-    dirs = ["UP", "LEFT", "DOWN", "RIGHT"]
-    idx = dirs.index(direction)
-    return dirs[(idx + steps_ccw) % 4]
-
-
-def get_scan_order(scan_start_local="FRONT", scan_sweep="cw", num_views=4):
-    scan_start_local = scan_start_local.upper()
-    scan_sweep = scan_sweep.lower()
-
-    if scan_sweep == "cw":
-        base_order = ["FRONT", "RIGHT", "BACK", "LEFT"]
-    elif scan_sweep == "ccw":
-        base_order = ["FRONT", "LEFT", "BACK", "RIGHT"]
-    else:
-        raise ValueError(f"scan_sweep must be 'cw' or 'ccw', got: {scan_sweep}")
-
-    if scan_start_local not in base_order:
-        raise ValueError(f"scan_start_local must be one of {base_order}, got: {scan_start_local}")
-
-    start_idx = base_order.index(scan_start_local)
-    ordered = base_order[start_idx:] + base_order[:start_idx]
-    return ordered[:num_views]
-
-
-def local_heading_to_map_direction(start_map_direction, local_heading):
-    local_heading = local_heading.upper()
-    local_steps_ccw = {
-        "FRONT": 0,
-        "LEFT": 1,
-        "BACK": 2,
-        "RIGHT": 3,
-    }
-    return rotate_direction(start_map_direction, local_steps_ccw[local_heading])
-
-
-def get_final_camera_direction_after_scan(
-    start_map_direction,
-    scan_start_local="FRONT",
-    scan_sweep="cw",
-    num_views=4
-):
-    order = get_scan_order(scan_start_local, scan_sweep, num_views)
-    final_local_heading = order[-1]
-    final_map_direction = local_heading_to_map_direction(
-        start_map_direction,
-        final_local_heading
-    )
-    return final_local_heading, final_map_direction
-
-
-def direction_to_char(direction):
-    mapping = {
-        "UP": "U",
-        "RIGHT": "R",
-        "DOWN": "D",
-        "LEFT": "L",
-    }
-    return mapping[direction]
-
-
-def find_best_match(local_color_3x3, big_grid):
-    rows = len(big_grid)
-    cols = len(big_grid[0])
-
-    candidates = []
-
-    for rot_steps in range(4):
-        rotated_local_color = rotate_n_ccw(local_color_3x3, rot_steps)
-        rotation_ccw_deg = rot_steps * 90
-
-        for center_r in range(1, rows - 1):
-            for center_c in range(1, cols - 1):
-                window = get_window_3x3(big_grid, center_r, center_c)
-                if window is None:
-                    continue
-
-                s = score_match(rotated_local_color, window)
-
-                if s["known"] < MIN_KNOWN_NEIGHBORS:
-                    continue
-                if s["mismatches"] > MAX_MISMATCHES:
-                    continue
-
-                candidates.append({
-                    "center_row": center_r,
-                    "center_col": center_c,
-                    "rot_steps": rot_steps,
-                    "rotation_ccw_deg": rotation_ccw_deg,
-                    "facing_raw": rotation_to_facing(rotation_ccw_deg),
-                    "known": s["known"],
-                    "matches": s["matches"],
-                    "mismatches": s["mismatches"],
-                    "score": s["score"],
-                    "rotated_local_color": rotated_local_color,
-                    "matched_biggrid_window": window,
-                })
-
-    if not candidates:
-        return None
-
-    candidates.sort(
-        key=lambda x: (x["score"], -x["mismatches"], x["known"]),
-        reverse=True
-    )
-    return candidates[0]
-
-
-def build_compact_17char(matched_biggrid_window, object_biggrid_perspective, final_direction_physical):
-    ""
-    17-character compact output:
-        8 surrounding cells x 2 chars each = 16
-        final physical direction char = 1
-
-    Each non-center cell:
-        floor color + object state
-
-    Example:
-        YE = Yellow tile, Empty object
-        PO = Purple tile, Obstacle
-        BT = Blue tile, Target
-    ""
-    out = []
-
-    for r in range(3):
-        for c in range(3):
-            if r == 1 and c == 1:
-                continue
-
-            floor_char = str(matched_biggrid_window[r][c]).strip().upper()[:1]
-            obj_char = str(object_biggrid_perspective[r][c]).strip().upper()[:1]
-
-            if obj_char not in ["T", "O", "E", "?"]:
-                obj_char = "?"
-
-            out.append(floor_char + obj_char)
-
-    out.append(direction_to_char(final_direction_physical))
-    return "".join(out)
-
-
-def map_location_and_build_compact(local_color_3x3, local_object_3x3):
-    best = find_best_match(local_color_3x3, BIG_GRID)
-
-    if best is None:
-        raise RuntimeError("No valid BIG_GRID match found.")
-
-    camera_direction_before_scan_raw = best["facing_raw"]
-
-    _, camera_direction_after_scan_raw = get_final_camera_direction_after_scan(
-        start_map_direction=camera_direction_before_scan_raw,
-        scan_start_local=SCAN_START_LOCAL,
-        scan_sweep=SCAN_SWEEP,
-        num_views=NUM_VIEWS
-    )
-
-    camera_direction_after_scan_physical = physical_direction_fix(
-        camera_direction_after_scan_raw
-    )
-
-    # Rotate object layer into BIG_GRID perspective using same color-match rotation.
-    object_biggrid_perspective = rotate_n_ccw(
-        local_object_3x3,
-        best["rot_steps"]
-    )
-
-    compact = build_compact_17char(
-        best["matched_biggrid_window"],
-        object_biggrid_perspective,
-        camera_direction_after_scan_physical
-    )
-
-    return compact"""
 
 # =========================================================
 # STEP 4: LOCAL COMPACT OUTPUT
@@ -857,11 +616,17 @@ def build_compact_local_16char(local_color_3x3, local_object_3x3):
             color_char = str(local_color_3x3[r][c]).strip().upper()[:1]
             obj_char = str(local_object_3x3[r][c]).strip().upper()[:1]
 
-            if color_char not in ["P", "Y", "B", "M", "?"]:
+            if color_char not in ["P", "Y", "B", "M", "X", "?"]:
                 color_char = "?"
 
             if obj_char not in ["T", "O", "E", "?"]:
                 obj_char = "?"
+
+            # If the floor color is X, the first character is what matters for
+            # localization. Keeping O is useful for movement logic because it
+            # says this neighbor is blocked.
+            if color_char == "X" and obj_char == "?":
+                obj_char = "O"
 
             out.append(color_char + obj_char)
 
