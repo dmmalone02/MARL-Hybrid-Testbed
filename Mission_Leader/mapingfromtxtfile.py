@@ -20,14 +20,14 @@ import argparse
 #   results/compact_map_result_{node}.txt
 #
 # The output is 20 characters:
-#   17 chars (original format) + "," + row + "," + col
+#   17 chars (original format) + "," + col + "," + row
 #   Example: "PEYEBEMEPEBTMEBEL,3,5"
 #
 # --- CHANGES FROM ORIGINAL ---
 # 1. BIG_GRID updated to confirmed 7x9 map
 # 2. Added --ep and --node command line arguments
 #    so each agent has its own input/output files
-# 3. Output now includes ",row,col" for Mission Leader
+# 3. Output now includes ",col,row" for Mission Leader
 # --- END CHANGES ---
 #
 # HOW TO RUN:
@@ -56,6 +56,7 @@ BIG_GRID = [
     ["B", "B", "Y", "Y", "M", "Y", "Y", "P", "B"],  # Row 5
     ["P", "B", "P", "M", "P", "M", "B", "Y", "Y"],  # Row 6
 ]
+#col  0    1    2    3    4    5    6    7    8
 
 MIN_KNOWN_NEIGHBORS = 5
 MAX_MISMATCHES = 1
@@ -220,7 +221,7 @@ def find_best_match(local_color_3x3, big_grid):
         return None
 
     candidates.sort(
-        key=lambda x: (x["score"], -x["mismatches"], x["known"]),
+        key=lambda x: (x["known"], x["score"], -x["mismatches"]),
         reverse=True
     )
     return candidates[0]
@@ -348,7 +349,7 @@ def map_location_from_compact_local(compact_local_file):
     row = best["center_row"]
     col = best["center_col"]
 
-    return compact_map_result, row, col
+    return compact_map_result, col, row
 
 
 # =========================================================
@@ -379,13 +380,13 @@ def main():
     compact_local_file = os.path.join(SENSING_DIR, f"Ep_{ep}_Node_{node}.txt")
     compact_map_file   = os.path.join(RESULTS_DIR, f"compact_map_result_Ep_{ep}_Node_{node}.txt")
 
-    compact_map_result, row, col = map_location_from_compact_local(
+    compact_map_result, col, row = map_location_from_compact_local(
         compact_local_file
     )
 
-    # Format: "17chars,row,col"
+    # Format: "17chars,col,row"
     # Example: "PEYEBEMEPEBTMEBEL,3,5"
-    full_output = f"{compact_map_result},{row},{col}"
+    full_output = f"{compact_map_result},{col},{row}"
 
     with open(compact_map_file, "w") as f:
         f.write(full_output + "\n")
