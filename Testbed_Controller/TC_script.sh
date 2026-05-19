@@ -25,9 +25,9 @@ AGENT_HOSTS=("10.1.1.120")
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Timing (seconds) ──────────────────────────────────────────────────────────
-WAIT_RX_STARTUP=10      # Time for Rx flowgraph to start
+WAIT_RX_STARTUP=10      # Time for ML Rx flowgraph to start
+WAIT_TX_STARTUP=15      # Time for agent TX flowgraph to start
 WAIT_ML_RX=80           # Time for ML Rx to fully receive transmission
-                        # (agent sensing+TX is done before SSH returns)
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -81,19 +81,33 @@ fi
 log_only "Rx flowgraph started. Waiting ${WAIT_RX_STARTUP}s..."
 sleep "$WAIT_RX_STARTUP"
 
+# ── Start TX flowgraph on each agent once for the whole mission ───────────────
+log_info "Starting TX flowgraph on agents..."
+for HOST in "${AGENT_HOSTS[@]}"; do
+    ssh -q "${REMOTE_USER}@${HOST}"         "bash -c 'nohup python3 SDR_RF_Hardware_01.py -n 120 > tx.log 2>&1 &'"         >> "$LOG_FILE" 2>&1
+    if [ $? -ne 0 ]; then
+        log_error "Failed to start TX flowgraph on agent @ $HOST — aborting mission."
+        exit 1
+    else
+        log_only "  TX flowgraph started on agent @ $HOST"
+    fi
+done
+log_info "TX flowgraphs started. Waiting ${WAIT_TX_STARTUP}s for initialisation..."
+sleep "$WAIT_TX_STARTUP"
+
 # ── Episode loop ──────────────────────────────────────────────────────────────
 for ((ep=1; ep<=N; ep++)); do
     log_info "======== Episode $ep / $N ========"
 
-    # Trigger all agents — wait for completion, capture sensing string
+    # Trigger all agents synchronously — TX flowgraph already running so
+    # move_tx_move.sh exits cleanly after sensing and transmitting
     log_only "Triggering agents..."
     for HOST in "${AGENT_HOSTS[@]}"; do
-        AGENT_OUTPUT=$(ssh -q "${REMOTE_USER}@${HOST}" "bash -ic './move_tx_move.sh $ep'" 2>> "$LOG_FILE")
+        AGENT_OUTPUT=$(ssh -q "${REMOTE_USER}@${HOST}"             "bash -ic './move_tx_move.sh $ep'" 2>> "$LOG_FILE")
         if [ $? -ne 0 ]; then
             log_error "Failed to trigger agent @ $HOST on episode $ep"
         else
-            # Extract the sensing string line tagged with [SENSING]
-            SENSE_STR=$(echo "$AGENT_OUTPUT" | grep '^\[SENSING\]' | sed 's/^\[SENSING\] //')
+            SENSE_STR=$(echo "$AGENT_OUTPUT" | grep '^\[SENSING\]' | sed 's/\[SENSING\] //')
             log_info "  Agent @ $HOST sensing: $SENSE_STR"
             echo "$AGENT_OUTPUT" >> "$LOG_FILE"
         fi
