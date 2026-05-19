@@ -27,7 +27,7 @@ AGENT_HOSTS=("10.1.1.120")
 # ── Timing (seconds) ──────────────────────────────────────────────────────────
 WAIT_RX_STARTUP=10      # Time for ML Rx flowgraph to start
 WAIT_TX_STARTUP=15      # Time for agent TX flowgraph to start
-WAIT_ML_RX=80           # Time for ML Rx to fully receive transmission
+WAIT_ML_RX=10           # Time for ML Rx to fully receive transmission
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -137,6 +137,19 @@ for ((ep=1; ep<=N; ep++)); do
 
     log_info "======== Episode $ep complete ========"
 done
+
+# ── Clean up flowgraphs ──────────────────────────────────────────────────────
+log_info "Cleaning up flowgraphs..."
+
+# Kill TX flowgraph on each agent
+for HOST in "${AGENT_HOSTS[@]}"; do
+    ssh -q "${REMOTE_USER}@${HOST}"         "pkill -f SDR_RF_Hardware_01.py" >> "$LOG_FILE" 2>&1
+    log_only "  TX flowgraph stopped on agent @ $HOST"
+done
+
+# Kill Rx flowgraph on ML
+ssh -q "${REMOTE_USER}@${REMOTE_HOST_ML}"     "pkill -f Integrated_Comms_Rx.py" >> "$LOG_FILE" 2>&1
+log_only "  Rx flowgraph stopped on ML"
 
 log_info "================================================"
 log_info "Mission complete. Full log: $LOG_FILE"
