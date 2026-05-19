@@ -31,7 +31,9 @@ WAIT_ML_RX=80           # Time for ML Rx to fully receive transmission
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Logging ───────────────────────────────────────────────────────────────────
-LOG_FILE="TC_mission_$(date +%Y%m%d_%H%M%S).log"
+LOG_DIR="Logs"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/TC_mission_$(date +%Y%m%d_%H%M%S).log"
 
 # log_only  — goes to log file only (silent on terminal)
 # log_error — goes to both terminal and log file (errors only on terminal)
