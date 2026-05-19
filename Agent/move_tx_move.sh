@@ -8,7 +8,9 @@
 EP=${1:-1}
 
 echo "[1] Sensing..."
-SENSING_OUTPUT=$(python3 sensing.py)
+SENSING_RAW=$(python3 sensing.py)
+# Compact string is always the last non-empty line of sensing.py output
+SENSING_OUTPUT=$(echo "$SENSING_RAW" | grep -v '^[[:space:]]*$' | tail -1)
 echo "[SENSING] $SENSING_OUTPUT"
 sleep 3
 
