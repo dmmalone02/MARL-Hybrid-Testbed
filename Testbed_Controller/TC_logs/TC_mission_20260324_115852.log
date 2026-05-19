@@ -1,0 +1,172 @@
+[11:58:52] ================================================
+[11:58:52] Mission start
+[11:58:52]   Episodes  : 1
+[11:58:52]   ML script : ML_Script_T.sh
+[11:58:52]   Target    : (5, 6)
+[11:58:52]   Agents    : 10.1.1.120
+[11:58:52]   Log file  : Logs/TC_mission_20260324_115852.log
+[11:58:52] ================================================
+[11:58:52] Starting ML Rx flowgraph...
+[11:58:52] Rx flowgraph started. Waiting 10s...
+[11:59:03] Starting TX flowgraph on agents...
+[11:59:03]   TX flowgraph started on agent @ 10.1.1.120
+[11:59:03] TX flowgraphs started. Waiting 15s for initialisation...
+[11:59:18] ======== Episode 1 / 1 ========
+[11:59:18] Triggering agents...
+bash: cannot set terminal process group (-1): Inappropriate ioctl for device
+bash: no job control in this shell
+[ WARN:0@1.120] global ./modules/videoio/src/cap_gstreamer.cpp (1405) open OpenCV | GStreamer warning: Cannot query video position: status=0, value=-1, duration=-1
+bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)
+bash: cannot set terminal process group (-1): Inappropriate ioctl for device
+bash: no job control in this shell
+bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)
+[INFO] [1753822093.927207716] [rotate]: Rotating -90.00 deg at 0.30 rad/s
+[INFO] [1753822094.250009120] [rotate]: Received first odometry reading.
+[INFO] [1753822100.005278539] [rotate]: Rotation complete.
+bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)
+bash: cannot set terminal process group (-1): Inappropriate ioctl for device
+bash: no job control in this shell
+bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)
+[INFO] [1753822112.790623653] [rotate]: Rotating -90.00 deg at 0.30 rad/s
+[INFO] [1753822113.308776989] [rotate]: Received first odometry reading.
+[INFO] [1753822118.973118483] [rotate]: Rotation complete.
+bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)
+bash: cannot set terminal process group (-1): Inappropriate ioctl for device
+bash: no job control in this shell
+bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)
+[INFO] [1753822131.762608367] [rotate]: Rotating -90.00 deg at 0.30 rad/s
+[INFO] [1753822134.120559963] [rotate]: Received first odometry reading.
+[INFO] [1753822139.751604205] [rotate]: Rotation complete.
+bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)
+bash: cannot set terminal process group (-1): Inappropriate ioctl for device
+bash: no job control in this shell
+bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)
+[INFO] [1753822152.671459505] [rotate]: Rotating -90.00 deg at 0.30 rad/s
+[INFO] [1753822153.162595123] [rotate]: Received first odometry reading.
+[INFO] [1753822158.852211402] [rotate]: Rotation complete.
+[12:00:58]   Agent @ 10.1.1.120 sensing: Intializing TurtleBot...
+[1] Sensing...
+[SENSING] Intializing TurtleBot...
+Sending rotate to ubuntu@192.168.185.3
+rotate angle_deg=-90.0 degrees, angular speed=0.3 m/s
+MOTION_DONE
+Intializing TurtleBot...
+Sending rotate to ubuntu@192.168.185.3
+rotate angle_deg=-90.0 degrees, angular speed=0.3 m/s
+MOTION_DONE
+Intializing TurtleBot...
+Sending rotate to ubuntu@192.168.185.3
+rotate angle_deg=-90.0 degrees, angular speed=0.3 m/s
+MOTION_DONE
+Intializing TurtleBot...
+Sending rotate to ubuntu@192.168.185.3
+rotate angle_deg=-90.0 degrees, angular speed=0.3 m/s
+MOTION_DONE
+
+[SCAN] FRONT
+Still frames: 0/3Still frames: 0/3Still frames: 1/3Still frames: 2/3Still frames: 3/3Captured.
+[MOVE] rotate -90.0 deg @ 0.3
+
+[SCAN] RIGHT
+Still frames: 0/3Still frames: 1/3Still frames: 2/3Still frames: 3/3Captured.
+[MOVE] rotate -90.0 deg @ 0.3
+
+[SCAN] BACK
+Still frames: 0/3Still frames: 1/3Still frames: 2/3Still frames: 3/3Captured.
+[MOVE] rotate -90.0 deg @ 0.3
+
+[SCAN] LEFT
+Still frames: 0/3Still frames: 1/3Still frames: 2/3Still frames: 3/3Captured.
+
+All captures complete. Restoring original orientation...
+[MOVE] rotate -90.0 deg @ 0.3
+YEPTYE?EPEYEYEYE
+[2] Transmitting...
+Setting Rx File to /home/ucanlab/Mission_Leader/Sensing_Files/Ep_1_Node_120.txt
+Triggering Tx node 120
+Switching file to dummy file
+Switching RX back to original file
+Episode Complete.
+Done.
+[12:00:58] Waiting 80s for ML Rx to fully receive transmission...
+[12:02:18] Running ML_Script_T.sh...
+================================================
+Episode 1 | Target (5, 6) | 2-Agent ML Mission
+================================================
+
+Locating agents...
+YEPTYEPEMEYEYEPEU,7,5
+Traceback (most recent call last):
+  File "/home/ucanlab/Mission_Leader/mapingfromtxtfile.py", line 424, in <module>
+    main()
+  File "/home/ucanlab/Mission_Leader/mapingfromtxtfile.py", line 408, in main
+    compact_map_result, col, row = map_location_from_compact_local(
+  File "/home/ucanlab/Mission_Leader/mapingfromtxtfile.py", line 340, in map_location_from_compact_local
+    pairs = read_compact_local_result(compact_local_file)
+  File "/home/ucanlab/Mission_Leader/mapingfromtxtfile.py", line 89, in read_compact_local_result
+    raise FileNotFoundError(f"Could not find file: {path}")
+FileNotFoundError: Could not find file: Sensing_Files/Ep_1_Node_121.txt
+[WARN] Could not localize Agent 2 (node 121)
+Located agents.
+
+Deciding movements...
+ML output: hold,hold
+
+Agent 1 (node 120): hold
+Agent 2 (node 121): hold
+
+Sending moves to agents...
+bash: cannot set terminal process group (-1): Inappropriate ioctl for device
+bash: no job control in this shell
+─────────────────────────────────────
+Sending to ubuntu@192.168.185.3
+  move:      hold
+  num_steps: 1
+  distance:  0.3 m
+─────────────────────────────────────
+bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)
+bash: cannot set terminal process group (-1): Inappropriate ioctl for device
+bash: no job control in this shell
+bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)
+[INFO] [1753822269.480876562] [random_walk_step]: Walk node started – 1 steps planned. Waiting for odometry…
+Invalid move command: hold
+Traceback (most recent call last):
+  File "/home/ubuntu/tb4_motion_ws/install/turtlebot4std/lib/turtlebot4std/random_walk_step", line 33, in <module>
+    sys.exit(load_entry_point('turtlebot4std', 'console_scripts', 'random_walk_step')())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/tb4_motion_ws/build/turtlebot4std/turtlebot4std/random_walk_step.py", line 303, in main
+    rclpy.spin(node)
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+    executor.spin_once()
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 839, in spin_once
+    self._spin_once_impl(timeout_sec)
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 834, in _spin_once_impl
+    raise handler.exception()
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/task.py", line 269, in __call__
+    self._handler.send(None)
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 518, in handler
+    await call_coroutine()
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 382, in _execute
+    await await_or_execute(tmr.callback)
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 111, in await_or_execute
+    return callback(*args)
+           ^^^^^^^^^^^^^^^
+  File "/home/ubuntu/tb4_motion_ws/build/turtlebot4std/turtlebot4std/random_walk_step.py", line 232, in control_loop
+    self._pick_move()
+  File "/home/ubuntu/tb4_motion_ws/build/turtlebot4std/turtlebot4std/random_walk_step.py", line 188, in _pick_move
+    f"─── Step {self.steps_completed + 1}/{self.num_steps}: {move} ───")
+                                                             ^^^^
+UnboundLocalError: cannot access local variable 'move' where it is not associated with a value
+[ros2run]: Process exited with failure 1
+[WARN] SSH to Agent 1 (node 120 @ 10.1.1.120) failed
+ssh: connect to host 10.1.1.121 port 22: No route to host
+[WARN] SSH to Agent 2 (node 121 @ 10.1.1.121) failed
+
+================================================
+Done. Episode 1 complete.
+================================================
+[12:02:33] ML_Script_T.sh completed successfully.
+[12:02:33] ======== Episode 1 complete ========
+[12:02:33] ================================================
+[12:02:33] Mission complete. Full log: Logs/TC_mission_20260324_115852.log
+[12:02:33] ================================================
