@@ -64,6 +64,10 @@ for i in "${!NODES[@]}"; do
     NODE="${NODES[$i]}"
     HOST="${AGENT_HOSTS[$i]}"
     MOVE="${MOVES[$i]}"
+    if [ "$MOVE" = "hold" ]; then
+        echo "Agent $((i+1)) (node $NODE): holding position — skipping move command"
+        continue
+    fi
     ssh "${REMOTE_USER}@${HOST}" "bash -ic './random_walk_tx.sh start 1 0.3 $MOVE'"
     if [ $? -ne 0 ]; then
         echo "[WARN] SSH to Agent $((i+1)) (node $NODE @ $HOST) failed"
