@@ -80,7 +80,7 @@ if [ $? -ne 0 ]; then
     log_error "Failed to start Rx flowgraph on ML — aborting mission."
     exit 1
 fi
-log_only "Rx flowgraph started. Waiting ${WAIT_RX_STARTUP}s..."
+log_info "Rx flowgraph started. Waiting ${WAIT_RX_STARTUP}s for startup..."
 sleep "$WAIT_RX_STARTUP"
 
 # ── Start TX flowgraph on each agent once for the whole mission ───────────────
@@ -105,17 +105,19 @@ for ((ep=1; ep<=N; ep++)); do
     # move_tx_move.sh exits cleanly after sensing and transmitting
     log_only "Triggering agents..."
     for HOST in "${AGENT_HOSTS[@]}"; do
+        log_info "  Agent @ $HOST sensing..."
         AGENT_OUTPUT=$(ssh -q "${REMOTE_USER}@${HOST}"             "bash -ic './move_tx_move.sh $ep'" 2>> "$LOG_FILE")
         if [ $? -ne 0 ]; then
             log_error "Failed to trigger agent @ $HOST on episode $ep"
         else
             SENSE_STR=$(echo "$AGENT_OUTPUT" | grep '^\[SENSING\]' | sed 's/\[SENSING\] //')
             log_info "  Agent @ $HOST sensing: $SENSE_STR"
+            log_info "  Agent @ $HOST transmitting..."
             echo "$AGENT_OUTPUT" >> "$LOG_FILE"
         fi
     done
 
-    log_only "Waiting ${WAIT_ML_RX}s for ML Rx to fully receive transmission..."
+    log_info "Waiting ${WAIT_ML_RX}s for ML Rx to receive transmission..."
     sleep "$WAIT_ML_RX"
 
     # Run ML script — stdout (location + decision) shown on terminal and logged
