@@ -21,7 +21,7 @@ REMOTE_USER="ucanlab"
 REMOTE_HOST_ML="10.1.1.100"
 
 # To add a second agent: add its IP to AGENT_HOSTS
-AGENT_HOSTS=("10.1.1.120")
+AGENT_HOSTS=("10.1.1.103")
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Timing (seconds) ──────────────────────────────────────────────────────────
@@ -83,15 +83,21 @@ fi
 log_info "Rx flowgraph started. Waiting ${WAIT_RX_STARTUP}s for startup..."
 sleep "$WAIT_RX_STARTUP"
 
-# ── Start TX flowgraph on each agent once for the whole mission ───────────────
-log_info "Starting TX flowgraph on agents..."
+# ── Start TX flowgraph and emergency stop on each agent once for the whole mission
+log_info "Starting TX flowgraph and emergency stop on agents..."
 for HOST in "${AGENT_HOSTS[@]}"; do
-    ssh -q "${REMOTE_USER}@${HOST}"         "bash -c 'nohup python3 SDR_RF_Hardware_01.py -n 120 > tx.log 2>&1 &'"         >> "$LOG_FILE" 2>&1
+    ssh -q "${REMOTE_USER}@${HOST}"         "bash -c 'nohup python3 SDR_RF_Hardware_01.py -n 103 > tx.log 2>&1 &'"         >> "$LOG_FILE" 2>&1
     if [ $? -ne 0 ]; then
         log_error "Failed to start TX flowgraph on agent @ $HOST — aborting mission."
         exit 1
     else
         log_only "  TX flowgraph started on agent @ $HOST"
+    fi
+    ssh -q "${REMOTE_USER}@${HOST}"         "bash -c 'nohup python3 T4_STOP.py -n 103 > /dev/null 2>&1 &'"         >> "$LOG_FILE" 2>&1
+    if [ $? -ne 0 ]; then
+        log_error "Failed to start emergency stop on agent @ $HOST"
+    else
+        log_only "  Emergency stop armed on agent @ $HOST"
     fi
 done
 log_info "TX flowgraphs started. Waiting ${WAIT_TX_STARTUP}s for initialisation..."
@@ -146,7 +152,9 @@ log_info "Cleaning up flowgraphs..."
 # Kill TX flowgraph on each agent
 for HOST in "${AGENT_HOSTS[@]}"; do
     ssh -q "${REMOTE_USER}@${HOST}"         "pkill -f SDR_RF_Hardware_01.py" >> "$LOG_FILE" 2>&1
+    ssh -q "${REMOTE_USER}@${HOST}"         "pkill -f T4_STOP.py" >> "$LOG_FILE" 2>&1
     log_only "  TX flowgraph stopped on agent @ $HOST"
+    log_only "  Emergency Button stopped on agent @ $HOST"
 done
 
 # Kill Rx flowgraph on ML
