@@ -6,6 +6,8 @@
 # at mission start — this script just senses and transmits.
 
 EP=${1:-1}
+NODE=103
+LED=2
 
 echo "[1] Sensing..."
 SENSING_RAW=$(python3 sensing.py)
@@ -15,6 +17,14 @@ echo "[SENSING] $SENSING_OUTPUT"
 sleep 3
 
 echo "[2] Transmitting..."
-python3 trigger_episode.py --tx_node 120 --rx_node 100 --ep "$EP"
+# Start LED blinking during transmission
+python3 T4_LED.py -n $NODE -l $LED &
+LED_PID=$!
+
+python3 trigger_episode.py --tx_node 103 --rx_node 100 --ep "$EP"
+
+# Stop LED when transmission is done
+kill $LED_PID 2>/dev/null
+wait $LED_PID 2>/dev/null
 
 echo "Done."
