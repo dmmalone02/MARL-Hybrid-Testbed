@@ -31,8 +31,13 @@ REMOTE_USER="ucanlab"
 REMOTE_HOST_ML="10.1.1.100"
 REMOTE_HOST_JAMMER="10.1.1.105"
 
-# To add a second agent: add its IP to AGENT_HOSTS
+# RF agents — use SDR_RF_Hardware_01.py flowgraph
 AGENT_HOSTS=("10.1.1.103")
+
+# OWC agent — static node, uses OWC_Push_Button.py flowgraph
+OWC_HOST="10.1.1.183"
+OWC_NODE="183"
+OWC_ENABLED=true   # set to false to disable OWC agent
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Timing (seconds) ──────────────────────────────────────────────────────────
@@ -78,7 +83,8 @@ log_info "Mission start"
 log_info "  Episodes  : $N"
 log_info "  ML script : $ML_SCRIPT"
 needs_target "$ML_SCRIPT" && log_info "  Target    : ($TARGET_X, $TARGET_Y)"
-log_info "  Agents    : ${AGENT_HOSTS[*]}"
+log_info "  RF Agents : ${AGENT_HOSTS[*]}"
+log_info "  OWC Agent : $OWC_HOST (node $OWC_NODE, enabled=$OWC_ENABLED)"
 if [ -n "$JAMMER_START_EP" ]; then
     log_info "  Jamming   : episodes $JAMMER_START_EP to $JAMMER_STOP_EP (noise=$JAMMER_NOISE_AMP gain=$JAMMER_TX_GAIN)"
 else
@@ -116,6 +122,17 @@ for HOST in "${AGENT_HOSTS[@]}"; do
         log_only "  Emergency stop armed on agent @ $HOST"
     fi
 done
+# ── Start OWC flowgraph on OWC agent ─────────────────────────────────────────
+if [ "$OWC_ENABLED" = true ]; then
+    log_info "Starting OWC flowgraph on OWC agent @ $OWC_HOST..."
+    ssh -q "${REMOTE_USER}@${OWC_HOST}"         "bash -c 'nohup python3 OWC_Push_Button.py -n $OWC_NODE > owc.log 2>&1 &'"         >> "$LOG_FILE" 2>&1
+    if [ $? -ne 0 ]; then
+        log_error "Failed to start OWC flowgraph on OWC agent @ $OWC_HOST"
+    else
+        log_only "  OWC flowgraph started on OWC agent @ $OWC_HOST"
+    fi
+fi
+
 log_info "TX flowgraphs started. Waiting ${WAIT_TX_STARTUP}s for initialisation..."
 sleep "$WAIT_TX_STARTUP"
 
@@ -199,6 +216,13 @@ log_only "  Rx flowgraph stopped on ML"
 ssh -q "${REMOTE_USER}@${REMOTE_HOST_JAMMER}" \
     "pkill -f RF_Jammer.py" >> "$LOG_FILE" 2>&1
 log_only "  RF jammer stopped on jammer machine"
+
+# Kill OWC flowgraph
+if [ "$OWC_ENABLED" = true ]; then
+    ssh -q "${REMOTE_USER}@${OWC_HOST}" \
+        "pkill -f OWC_Push_Button.py" >> "$LOG_FILE" 2>&1
+    log_only "  OWC flowgraph stopped on OWC agent @ $OWC_HOST"
+fi
 
 log_info "================================================"
 log_info "Mission complete. Full log: $LOG_FILE"
