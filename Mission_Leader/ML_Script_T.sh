@@ -10,8 +10,9 @@ REMOTE_USER="ucanlab"
 # ── Agent nodes and their IPs ─────────────────────────────────────────────────
 # To add a new agent: add its node ID to NODES and its IP to AGENT_HOSTS
 # Order must match between the two arrays.
-NODES=("103")
-AGENT_HOSTS=("10.1.1.103")
+NODES=("103" "183")
+AGENT_HOSTS=("10.1.1.103" "STATIC")
+STATIC_NODE="183"
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Arguments ─────────────────────────────────────────────────────────────────
@@ -64,6 +65,10 @@ for i in "${!NODES[@]}"; do
     NODE="${NODES[$i]}"
     HOST="${AGENT_HOSTS[$i]}"
     MOVE="${MOVES[$i]}"
+    if [ "$NODE" = "$STATIC_NODE" ]; then
+        echo "Agent $((i+1)) (node $NODE): decision = $MOVE, static agent — skipping SSH move"
+        continue
+    fi
     if [ "$MOVE" = "hold" ]; then
         echo "Agent $((i+1)) (node $NODE): holding position — skipping move command"
         continue
