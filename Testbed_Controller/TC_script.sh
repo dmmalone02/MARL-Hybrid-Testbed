@@ -14,11 +14,22 @@ N=${1:-1}
 ML_SCRIPT=${2:-ML_Script_T.sh}
 TARGET_X=${3:-5}
 TARGET_Y=${4:-5}
+
+# ── Jammer parameters ─────────────────────────────────────────────────────────
+# Jamming is optional — only activates if start/stop episodes are passed as args
+#   ./TC_script.sh <episodes> <ml_script> <target_x> <target_y> <jam_start> <jam_stop>
+#   Example: ./TC_script.sh 5 ML_Script_T.sh 5 6 2 3    (jam episodes 2-3)
+#   Example: ./TC_script.sh 5 ML_Script_T.sh 5 6         (no jamming)
+JAMMER_START_EP=${5:-}      # Episode to start jamming (empty = no jamming)
+JAMMER_STOP_EP=${6:-}       # Episode to stop jamming (inclusive)
+JAMMER_NOISE_AMP=10         # Noise amplitude
+JAMMER_TX_GAIN=50           # Transmit gain
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Hosts ─────────────────────────────────────────────────────────────────────
 REMOTE_USER="ucanlab"
 REMOTE_HOST_ML="10.1.1.100"
+REMOTE_HOST_JAMMER="10.1.1.105"
 
 # To add a second agent: add its IP to AGENT_HOSTS
 AGENT_HOSTS=("10.1.1.103")
@@ -68,6 +79,11 @@ log_info "  Episodes  : $N"
 log_info "  ML script : $ML_SCRIPT"
 needs_target "$ML_SCRIPT" && log_info "  Target    : ($TARGET_X, $TARGET_Y)"
 log_info "  Agents    : ${AGENT_HOSTS[*]}"
+if [ -n "$JAMMER_START_EP" ]; then
+    log_info "  Jamming   : episodes $JAMMER_START_EP to $JAMMER_STOP_EP (noise=$JAMMER_NOISE_AMP gain=$JAMMER_TX_GAIN)"
+else
+    log_info "  Jamming   : disabled"
+fi
 log_info "  Log file  : $LOG_FILE"
 log_info "================================================"
 
@@ -107,6 +123,17 @@ sleep "$WAIT_TX_STARTUP"
 for ((ep=1; ep<=N; ep++)); do
     log_info "======== Episode $ep / $N ========"
 
+    # ── Jammer control ───────────────────────────────────────────────────────
+    if [ -n "$JAMMER_START_EP" ] && [ "$ep" -eq "$JAMMER_START_EP" ]; then
+        log_info "Starting RF jammer on episode $ep..."
+        ssh -q "${REMOTE_USER}@${REMOTE_HOST_JAMMER}"             "bash -c 'nohup python3 RF_Jammer.py -t $JAMMER_NOISE_AMP -g $JAMMER_TX_GAIN > jammer.log 2>&1 &'"             >> "$LOG_FILE" 2>&1
+        if [ $? -ne 0 ]; then
+            log_error "Failed to start jammer on episode $ep"
+        else
+            log_info "RF jammer started."
+        fi
+    fi
+
     # Trigger all agents synchronously — TX flowgraph already running so
     # move_tx_move.sh exits cleanly after sensing and transmitting
     log_only "Triggering agents..."
@@ -143,6 +170,13 @@ for ((ep=1; ep<=N; ep++)); do
         log_only "$ML_SCRIPT completed successfully."
     fi
 
+    # ── Stop jammer if this is the stop episode ─────────────────────────────
+    if [ -n "$JAMMER_STOP_EP" ] && [ "$ep" -eq "$JAMMER_STOP_EP" ]; then
+        log_info "Stopping RF jammer after episode $ep..."
+        ssh -q "${REMOTE_USER}@${REMOTE_HOST_JAMMER}"             "pkill -f RF_Jammer.py" >> "$LOG_FILE" 2>&1
+        log_info "RF jammer stopped."
+    fi
+
     log_info "======== Episode $ep complete ========"
 done
 
@@ -160,6 +194,11 @@ done
 # Kill Rx flowgraph on ML
 ssh -q "${REMOTE_USER}@${REMOTE_HOST_ML}"     "pkill -f Integrated_Comms_Rx.py" >> "$LOG_FILE" 2>&1
 log_only "  Rx flowgraph stopped on ML"
+
+# Kill jammer if still running (e.g. mission ended early)
+ssh -q "${REMOTE_USER}@${REMOTE_HOST_JAMMER}" \
+    "pkill -f RF_Jammer.py" >> "$LOG_FILE" 2>&1
+log_only "  RF jammer stopped on jammer machine"
 
 log_info "================================================"
 log_info "Mission complete. Full log: $LOG_FILE"
