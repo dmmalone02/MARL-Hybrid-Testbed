@@ -10,8 +10,8 @@ REMOTE_USER="ucanlab"
 # ── Agent nodes and their IPs ─────────────────────────────────────────────────
 # To add a new agent: add its node ID to NODES and its IP to AGENT_HOSTS
 # Order must match between the two arrays.
-NODES=("120" "121")
-AGENT_HOSTS=("10.1.1.120" "10.1.1.121")
+NODES=("103")
+AGENT_HOSTS=("10.1.1.103")
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Arguments ─────────────────────────────────────────────────────────────────
@@ -68,7 +68,7 @@ for i in "${!NODES[@]}"; do
         echo "Agent $((i+1)) (node $NODE): holding position — skipping move command"
         continue
     fi
-    ssh "${REMOTE_USER}@${HOST}" "bash -ic './random_walk_tx.sh start 1 0.3 $MOVE'"
+    ssh "${REMOTE_USER}@${HOST}" "bash -ic './random_walk_tx.sh start 1 0.23 $MOVE'"
     if [ $? -ne 0 ]; then
         echo "[WARN] SSH to Agent $((i+1)) (node $NODE @ $HOST) failed"
     fi
