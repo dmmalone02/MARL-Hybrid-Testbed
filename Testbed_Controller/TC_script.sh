@@ -33,6 +33,7 @@ REMOTE_HOST_JAMMER="10.1.1.105"
 
 # RF agents — use SDR_RF_Hardware_01.py flowgraph
 AGENT_HOSTS=("10.1.1.103")
+AGENT_NODES=("103")
 
 # OWC agent — static node, uses OWC_Push_Button.py flowgraph
 OWC_HOST="10.1.1.183"
@@ -107,15 +108,18 @@ sleep "$WAIT_RX_STARTUP"
 
 # ── Start TX flowgraph and emergency stop on each agent once for the whole mission
 log_info "Starting TX flowgraph and emergency stop on agents..."
-for HOST in "${AGENT_HOSTS[@]}"; do
-    ssh -q "${REMOTE_USER}@${HOST}"         "bash -c 'nohup python3 SDR_RF_Hardware_01.py -n 103 > tx.log 2>&1 &'"         >> "$LOG_FILE" 2>&1
+for i in "${!AGENT_HOSTS[@]}"; do
+    HOST="${AGENT_HOSTS[$i]}"
+    AGENT_NODE="${AGENT_NODES[$i]}"
+
+    ssh -q "${REMOTE_USER}@${HOST}"         "bash -c 'nohup python3 SDR_RF_Hardware_01.py -n ${AGENT_NODE} > tx.log 2>&1 &'"         >> "$LOG_FILE" 2>&1
     if [ $? -ne 0 ]; then
         log_error "Failed to start TX flowgraph on agent @ $HOST — aborting mission."
         exit 1
     else
         log_only "  TX flowgraph started on agent @ $HOST"
     fi
-    ssh -q "${REMOTE_USER}@${HOST}"         "bash -c 'nohup python3 T4_STOP.py -n 103 > /dev/null 2>&1 &'"         >> "$LOG_FILE" 2>&1
+    ssh -q "${REMOTE_USER}@${HOST}"         "bash -c 'nohup python3 T4_STOP.py -n ${AGENT_NODE} > /dev/null 2>&1 &'"         >> "$LOG_FILE" 2>&1
     if [ $? -ne 0 ]; then
         log_error "Failed to start emergency stop on agent @ $HOST"
     else
@@ -130,6 +134,12 @@ if [ "$OWC_ENABLED" = true ]; then
         log_error "Failed to start OWC flowgraph on OWC agent @ $OWC_HOST"
     else
         log_only "  OWC flowgraph started on OWC agent @ $OWC_HOST"
+    fi
+    ssh -q "${REMOTE_USER}@${OWC_HOST}"         "bash -c 'nohup python3 T4_STOP.py -n $OWC_NODE > /dev/null 2>&1 &'"         >> "$LOG_FILE" 2>&1
+    if [ $? -ne 0 ]; then
+        log_error "Failed to start emergency stop on agent @ $OWC_HOST"
+    else
+        log_only "  Emergency stop armed on agent @ $OWC_HOST"
     fi
 fi
 
