@@ -75,18 +75,18 @@ class RandomWalkStep(Node):
         super().__init__('random_walk_step')
 
         # ── Parameters ──────────────────────────────────────────────────
-        self.declare_parameter('distance', 0.5)      # metres per forward move
+        self.declare_parameter('distance', 0.34)      # metres per forward move
         self.declare_parameter('speed', 0.1)         # m/s
-        self.declare_parameter('angular_speed', 0.5) # rad/s
+        self.declare_parameter('angular_speed', 0.4) # rad/s
         self.declare_parameter('pause_sec', 0.5)     # seconds between moves
-        self.declare_parameter('num_steps', 10)      # total moves before shutdown
+        self.declare_parameter('num_steps', 1)      # total moves before shutdown
         self.declare_parameter('move', 'random')     # forward/backward/turn_left/turn_right/random
 
-        self.target_distance = abs(float(self.get_parameter('distance').value), 0.3)
-        self.speed           = abs(float(self.get_parameter('speed').value), 0.3)
-        self.angular_speed   = abs(float(self.get_parameter('angular_speed').value), 0.3)
-        self.pause_sec       = float(self.get_parameter('pause_sec').value, 1)
-        self.num_steps       = int(self.get_parameter('num_steps').value, 1)
+        self.target_distance = abs(float(self.get_parameter('distance').value))
+        self.speed           = abs(float(self.get_parameter('speed').value))
+        self.angular_speed   = abs(float(self.get_parameter('angular_speed').value))
+        self.pause_sec       = float(self.get_parameter('pause_sec').value)
+        self.num_steps       = int(self.get_parameter('num_steps').value)
 
         # ── ROS interfaces ───────────────────────────────────────────────
         self.cmd_pub = self.create_publisher(
@@ -115,7 +115,7 @@ class RandomWalkStep(Node):
 
         # ── Timer (10 Hz) ────────────────────────────────────────────────
         self.timer = self.create_timer(0.1, self.control_loop)
-        self.get_logger().info(f"RandomWalk node started – {self.num_steps} steps planned. Waiting for odometry…")
+        self.get_logger().info(f"Walk node started – {self.num_steps} steps planned. Waiting for odometry…")
 
     # ─────────────────────────────────────────
     #  Odometry callback
@@ -245,7 +245,7 @@ class RandomWalkStep(Node):
                 self._publish_linear(self.speed)
             else:
                 self._stop()
-                self.get_logger().info("✔ Forward complete.")
+                self.get_logger().info("Forward complete.")
                 self._begin_pause()
             return
 
