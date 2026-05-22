@@ -37,6 +37,8 @@ echo ""
 echo "Locating agents..."
 for i in "${!NODES[@]}"; do
     NODE="${NODES[$i]}"
+    # Delete old results file before localizing so stale data cant be read
+    rm -f Results/compact_map_result_Ep_*_Node_${NODE}.txt
     python3 mapingfromtxtfile.py --ep "$EP" --node "$NODE"
     if [ $? -ne 0 ]; then
         echo "[WARN] Could not localize Agent $((i+1)) (node $NODE)"
@@ -73,7 +75,7 @@ for i in "${!NODES[@]}"; do
         echo "Agent $((i+1)) (node $NODE): holding position — skipping move command"
         continue
     fi
-    ssh "${REMOTE_USER}@${HOST}" "bash -ic './random_walk_tx.sh start 1 0.23 $MOVE'"
+    ssh "${REMOTE_USER}@${HOST}" "bash -ic './random_walk_tx.sh start 1 0.24 $MOVE'"
     if [ $? -ne 0 ]; then
         echo "[WARN] SSH to Agent $((i+1)) (node $NODE @ $HOST) failed"
     fi
