@@ -52,11 +52,6 @@ class RotateAngle(Node):
             Twist, '/tb_02/cmd_vel_unstamped', 10
         )
 
-        odom_qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
-            history=HistoryPolicy.KEEP_LAST,
-            depth=10
-        )
 
         self.odom_sub = self.create_subscription(
             Odometry,
