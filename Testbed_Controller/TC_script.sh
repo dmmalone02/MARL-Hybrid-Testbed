@@ -32,8 +32,8 @@ REMOTE_HOST_ML="10.1.1.100"
 REMOTE_HOST_JAMMER="10.1.1.105"
 
 # RF agents — use SDR_RF_Hardware_01.py flowgraph
-AGENT_HOSTS=("10.1.1.103")
-AGENT_NODES=("103")
+AGENT_HOSTS=("10.1.1.103" "10.1.1.104")
+AGENT_NODES=("103" "104")
 
 # OWC agent — static node, uses OWC_Push_Button.py flowgraph
 OWC_HOST="10.1.1.183"
@@ -129,13 +129,13 @@ done
 # ── Start OWC flowgraph on OWC agent ─────────────────────────────────────────
 if [ "$OWC_ENABLED" = true ]; then
     log_info "Starting OWC flowgraph on OWC agent @ $OWC_HOST..."
-    ssh -q "${REMOTE_USER}@${OWC_HOST}"         "bash -c 'nohup python3 OWC_Push_Button.py -n $OWC_NODE > owc.log 2>&1 &'"         >> "$LOG_FILE" 2>&1
+    ssh -q "${REMOTE_USER}@${OWC_HOST}"         "bash -c 'nohup python3 /home/ucanlab/ucan_TB/TB_Scripts/OWC_Push_Button.py -n $OWC_NODE > owc.log 2>&1 &'"         >> "$LOG_FILE" 2>&1
     if [ $? -ne 0 ]; then
         log_error "Failed to start OWC flowgraph on OWC agent @ $OWC_HOST"
     else
         log_only "  OWC flowgraph started on OWC agent @ $OWC_HOST"
     fi
-    ssh -q "${REMOTE_USER}@${OWC_HOST}"         "bash -c 'nohup python3 T4_STOP.py -n $OWC_NODE > /dev/null 2>&1 &'"         >> "$LOG_FILE" 2>&1
+    ssh -q "${REMOTE_USER}@${OWC_HOST}"         "bash -c 'nohup python3 /home/ucanlab/ucan_TB/TB_Scripts/T4_STOP.py -n $OWC_NODE > /dev/null 2>&1 &'"         >> "$LOG_FILE" 2>&1
     if [ $? -ne 0 ]; then
         log_error "Failed to start emergency stop on agent @ $OWC_HOST"
     else
@@ -176,7 +176,17 @@ for ((ep=1; ep<=N; ep++)); do
             echo "$AGENT_OUTPUT" >> "$LOG_FILE"
         fi
     done
-
+    log_info "  Agent @ $OWC_HOST sensing..."
+    OWC_OUTPUT=$(ssh -q "${REMOTE_USER}@${OWC_HOST}"             "bash -ic './move_tx_move_optical.sh $ep'" 2>> "$LOG_FILE")
+        if [ $? -ne 0 ]; then
+            log_error "Failed to trigger agent @ $OWC_HOST on episode $ep"
+        else
+            SENSE_OWC_STR=$(echo "$OWC_OUTPUT" | grep '^\[SENSING\]' | sed 's/\[SENSING\] //')
+            log_info "  Agent @ $OWC_HOST sensing: $SENSE_OWC_STR"
+            log_info "  Agent @ $OWC_HOST transmitting..."
+            echo "$OWC_OUTPUT" >> "$LOG_FILE"
+        fi
+    
     log_info "Waiting ${WAIT_ML_RX}s for ML Rx to receive transmission..."
     sleep "$WAIT_ML_RX"
 
