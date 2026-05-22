@@ -21,7 +21,7 @@ echo "[2] Transmitting..."
 python3 T4_LED.py -n $NODE -l $LED &
 LED_PID=$!
 
-python3 trigger_episode.py --tx_node 103 --rx_node 100 --ep "$EP"
+python3 trigger_episode.py --tx_node $NODE --rx_node 100 --ep "$EP"
 
 # Stop LED when transmission is done
 kill $LED_PID 2>/dev/null
