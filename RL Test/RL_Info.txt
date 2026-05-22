@@ -1,0 +1,74 @@
+========================================
+Message Trigger / Experiment Control Scripts
+========================================
+
+1. message_trigger_xmlrpc_rand.py (file should be on Agent pi)
+
+This script runs on the active communication agent and controls the RF/OWC experiment using XML-RPC with random channel selection. It acts as the baseline communication 
+scenario and does not implement reinforcement learning. The script automates transmission triggering, RF/OWC path selection, RX filename updates, and Packet Error Rate 
+(PER) evaluation for each experiment episode.
+
+
+----------------------------------------
+
+
+2. message_trigger_rl.py (file should be on Agent pi)
+
+This script implements a reinforcement learning framework for adaptive RF/OWC communication on a single communication agent. The RL algorithm dynamically selects either 
+RF or OWC based on measured communication performance metrics such as Packet Error Rate (PER).The script automates episode execution, XML-RPC communication with TX/RX 
+flowgraphs, PER evaluation, statistic updates, and experiment logging across multiple communication instances.
+
+
+----------------------------------------
+
+
+3. message_trigger_2tx.py (file should on Testbed Controller Pi/Laptop)
+
+This script extends the reinforcement learning communication framework to a dual-agent system where both agents possess RF and OWC communication capability. The script 
+coordinates transmissions between the two agents and evaluates communication performance across multiple experiment instances. The RL algorithm updates communication 
+statistics over time to determine the preferred transmission method based on measured communication reliability and performance metrics.
+
+
+----------------------------------------
+
+
+4. message_trigger_2tx_jammer.py (file should be on Testbed Controller Pi/Laptop)
+
+
+This script extends the dual-agent reinforcement learning communication scenario by introducing jammer functionality into the experiment. The system evaluates RF and OWC 
+communication performance under interference conditions and dynamically updates RL statistics based on measured communication degradation.The script automates jammer 
+integration, multi-agent coordination, XML-RPC communication control, PER evaluation, and adaptive communication decision-making during the experiment process.
+
+
+----------------------------------------
+
+
+5. rx_file_evaluator.py
+
+This script runs on the RX node and provides a lightweight XML-RPC service for evaluating received episode files. It reads the RX output file locally, counts the number of 
+received packet lines, and computes Packet Error Rate (PER) using the number of expected transmissions. This evaluator is used by the message trigger scripts so that the 
+main experiment controller does not need to directly read files from the RX node. It should be started before running the RL experiment and listens on port 8082.
+
+
+========================================
+Flowgraph Notes
+========================================
+
+1. Integrated_Flow_Graph.py
+
+This flowgraph supports RF and OWC communication using a USRP for RF transmission/reception and an AD3 for OWC transmission. It is designed to work with the XML-RPC message 
+trigger scripts, which control path selection, triggering, and RX filename updates during the experiment. For this setup, the AD3-based OWC transmission requires the message 
+trigger to be pressed twice for reliable transmission. Any control script using this flowgraph should account for the double-trigger behavior when sending messages.
+
+
+----------------------------------------
+
+
+2. T4_Comms_Pluto.py
+
+This flowgraph supports RF and OWC communication using a PlutoSDR for RF transmission/reception and an AD3 for OWC transmission. It is also controlled through XML-RPC and is 
+compatible with the same experiment automation structure used by the message trigger scripts. For this setup, the AD3-based OWC transmission only requires one trigger press 
+for reliable transmission. Control scripts using this flowgraph should use a single-trigger behavior rather than the double-trigger timing used with Integrated_Flow_Graph.py.
+
+
+========================================
