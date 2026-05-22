@@ -5,7 +5,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Bool   
+from std_msgs.msg import Bool
 
 #################################################################################################################
 #################################################################################################################
@@ -83,13 +83,13 @@ class MoveForward(Node):
             self.cmd_pub.publish(cmd)
 
             if not self.done_sent:
-                print("MOTION_DONE") 
+                print("MOTION_DONE")
                 self.get_logger().info("Target distance reached. Stopping.")
                 self.done_sent = True
 
             rclpy.shutdown()
             return
-        
+
 
 
 def main(args=None):
