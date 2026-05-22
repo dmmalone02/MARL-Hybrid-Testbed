@@ -7,7 +7,7 @@
 
 EP=${1:-1}
 NODE=103
-LED=2
+LED=$(python3 led_select.py --pref 2 --bias 0.7)
 
 echo "[1] Sensing..."
 SENSING_RAW=$(python3 sensing.py)
