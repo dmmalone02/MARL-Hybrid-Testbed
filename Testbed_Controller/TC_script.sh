@@ -177,7 +177,7 @@ for ((ep=1; ep<=N; ep++)); do
         fi
     done
     log_info "  Agent @ $OWC_HOST sensing..."
-    OWC_OUTPUT=$(ssh -q "${REMOTE_USER}@${OWC_HOST}"             "bash -ic './move_tx_move_optical.sh $ep'" 2>> "$LOG_FILE")
+    OWC_OUTPUT=$(ssh -q "${REMOTE_USER}@${OWC_HOST}"             "bash -ic '/home/ucanlab/ucan_TB/TB_Scripts/move_tx_move_optical.sh $ep'" 2>> "$LOG_FILE")
         if [ $? -ne 0 ]; then
             log_error "Failed to trigger agent @ $OWC_HOST on episode $ep"
         else
