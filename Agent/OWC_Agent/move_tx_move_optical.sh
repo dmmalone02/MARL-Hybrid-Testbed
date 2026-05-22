@@ -8,7 +8,7 @@
 EP=${1:-1}
 NODE=183
 LED=1
-OWC_SENCS="/home/ucanlab/Downloads/test.txt"
+OWC_SENSE="/home/ucanlab/Downloads/test.txt"
 
 echo "[1] Sensing..."
 SENSING_OUTPUT=$(cat "$OWC_SENSE" 2>/dev/null | grep -v '^[[:space:]]*$' | tail -1)
