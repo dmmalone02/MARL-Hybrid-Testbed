@@ -7,7 +7,7 @@
 
 EP=${1:-1}
 NODE=183
-LED=1
+LED=$(python3 led_select.py --pref 1 --bias 1)
 OWC_SENSE="/home/ucanlab/Downloads/test.txt"
 
 echo "[1] Sensing..."
