@@ -10,8 +10,8 @@ REMOTE_USER="ucanlab"
 # ── Agent nodes and their IPs ─────────────────────────────────────────────────
 # To add a new agent: add its node ID to NODES and its IP to AGENT_HOSTS
 # Order must match between the two arrays.
-NODES=("103" "183")
-AGENT_HOSTS=("10.1.1.103" "STATIC")
+NODES=("103" "104" "183")
+AGENT_HOSTS=("10.1.1.103" "10.1.1.104" "STATIC")
 STATIC_NODE="183"
 # ─────────────────────────────────────────────────────────────────────────────
 
